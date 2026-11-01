@@ -19,6 +19,9 @@ export function MatchBadge({ value }: { value: MismatchResult['result'] }) {
   if (value === 'match') {
     return <span className="font-semibold text-dash-teal">✓ Match</span>
   }
+  if (value === 'cannot_determine') {
+    return <span className="font-bold text-dash-attention">? Cannot determine — merchant review</span>
+  }
   if (value === 'missing') {
     return <span className="font-bold text-dash-attention">⚠ Record missing</span>
   }

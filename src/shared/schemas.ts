@@ -67,7 +67,7 @@ export type MismatchResult = {
   grant: string | null
   merchant_terms: string | null
   actual: string | null
-  result: 'match' | 'mismatch' | 'unspecified' | 'missing'
+  result: 'match' | 'mismatch' | 'unspecified' | 'missing' | 'cannot_determine' // cannot_determine: Returns only, never a problem by itself
   cause: string | null
   next_action_who: string | null
   cited_fields: string[]

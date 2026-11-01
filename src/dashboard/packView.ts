@@ -28,6 +28,7 @@ const esc = (v: unknown) =>
 
 const RESULT: Record<string, string> = {
   match: 'Match', mismatch: 'Mismatch', unspecified: 'Not specified by the customer — no check', not_in_record: 'Not in AgentReceipt record', in_record: 'In record (merchant review)', missing: 'Record missing',
+  cannot_determine: 'Cannot determine from summary as presented — merchant review required for that field',
 }
 
 // The printable pack: rendered only from the same object as the JSON, so the two cannot diverge.

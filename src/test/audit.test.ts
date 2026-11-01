@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { audit, GAP_NOTE, MERCHANT_FOOTER, RECOMMENDS_NOTE, requiresAttention, type AuditInput, type GrantIn, type ActionIn } from '../../supabase/functions/_shared/audit'
+import { audit, RETURNS_CANNOT_DETERMINE, GAP_NOTE, MERCHANT_FOOTER, RECOMMENDS_NOTE, requiresAttention, type AuditInput, type GrantIn, type ActionIn } from '../../supabase/functions/_shared/audit'
 
 const okHash = { grant_ok: true, proposal_ok: true, action_ok: true, links_ok: true }
 
@@ -246,5 +246,34 @@ describe('detection engine: Pass / Review Required / Hold for Suspicion', () => 
     const r = audit(input({ action: orca({ agent_summary_delivery: 'Thu Oct 29' }), terms: freeReturns }))
     expect(Object.keys(r.agent_summary ?? {}).sort()).toEqual(['agent_believed_terms', 'agent_summary_delivery', 'agent_summary_returns', 'delivery_claimed_date', 'delivery_source', 'returns_reason', 'returns_summary_matches_terms'])
     expect(JSON.stringify(r)).not.toMatch(/"(chat|messages|proposal_text|transcript)"/)
+  })
+})
+
+describe('detection engine: multilingual Returns comparison, Cannot determine', () => {
+  const cannot = { returns_summary_matches_terms: null, returns_comparison: 'cannot_determine' as const, reason: 'Cannot tell.', source: 'muse-spark' as const }
+  const es = 'Consulta la política de la tienda'
+
+  it('is recorded as Cannot determine, not a match and not a problem; all else passing, the verdict is Pass', () => {
+    const r = audit(input({ terms: freeReturns, action: orca({ agent_summary_returns: es, agent_believed_returns: es }), semantic_returns: cannot }))
+    expect(result(r, 'Returns')).toMatchObject({ result: 'cannot_determine', cause: RETURNS_CANNOT_DETERMINE, who: 'Merchant' })
+    expect(r).toMatchObject({ decision: 'pass', problems: 0, problem_fields: [] })
+    expect(r.agent_summary?.returns_comparison).toBe('cannot_determine')
+  })
+
+  it('does not force Review Required by itself; another mismatch (late delivery) decides it', () => {
+    const r = audit(input({ terms: freeReturns, grant: grant({ delivery_by: '2026-10-28' }), action: orca({ agent_summary_returns: es, agent_believed_returns: es }), semantic_returns: cannot }))
+    expect(result(r, 'Returns').result).toBe('cannot_determine')
+    expect(r).toMatchObject({ decision: 'review_required', problems: 1, problem_fields: ['Delivery'] })
+  })
+
+  it('does not hide a missing record: Hold for Suspicion still wins', () => {
+    const r = audit(input({ terms: freeReturns, proposal_present: false, action: orca({ agent_summary_returns: es, agent_believed_returns: es }), semantic_returns: cannot }))
+    expect(r.decision).toBe('hold_suspicion')
+  })
+
+  it('the earlier answer shape (no returns_comparison) behaves exactly as before, and adds no new key', () => {
+    const r = audit(input({ terms: freeReturns, action: orca({ agent_believed_returns: 'ok to send back within a month' }), semantic_returns: { returns_summary_matches_terms: true, reason: 'Both claim returns.', source: 'muse-spark' } }))
+    expect(result(r, 'Returns').result).toBe('match')
+    expect(Object.keys(r.agent_summary ?? {})).not.toContain('returns_comparison')
   })
 })

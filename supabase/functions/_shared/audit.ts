@@ -25,7 +25,9 @@ export const PAYMENT_REF = 'Demo Checkout'
 
 export type Decision = 'pass' | 'review_required' | 'hold_suspicion'
 export const DECISION_LABEL: Record<Decision, string> = { pass: 'Pass', review_required: 'Review Required', hold_suspicion: 'Hold for Suspicion' }
-export type CheckResult = 'match' | 'mismatch' | 'unspecified' | 'missing'
+// cannot_determine: only on Returns, when Spark (or the keyword fallback) cannot tell what the agent's summary, as presented,
+// says about returns. It is never a match and never, by itself, a mismatch: it is not counted as a problem.
+export type CheckResult = 'match' | 'mismatch' | 'unspecified' | 'missing' | 'cannot_determine'
 
 export type GrantIn = {
   merchant_allowlist: string[]
@@ -69,8 +71,17 @@ export type HashIn = { grant_ok: boolean | null; proposal_ok: boolean | null; ac
 
 // Spark call 3: do the agent's STRUCTURED returns fields and the merchant's formal terms say the same thing?
 // Spark answers the language question only; the rules below make the match and decide the verdict.
-// matches === null means "could not tell" and the plain keyword reading is used instead.
-export type SemanticReturns = { returns_summary_matches_terms: boolean | null; reason: string; source: 'muse-spark' | 'rules-fallback' }
+// The summary may be in any language (tested: English, Spanish, Hindi); the formal terms stay in English.
+// returns_comparison is the three-way answer. Without it, matches === null means "could not tell" and the plain keyword
+// reading is used instead (the earlier shape, kept for callers that do not set returns_comparison).
+export type ReturnsComparison = 'match' | 'mismatch' | 'cannot_determine'
+export type SemanticReturns = {
+  returns_summary_matches_terms: boolean | null
+  returns_comparison?: ReturnsComparison
+  reason: string
+  source: 'muse-spark' | 'rules-fallback'
+}
+export const RETURNS_CANNOT_DETERMINE = 'Returns comparison cannot be determined from summary as presented — merchant review required for that field'
 // Spark call 4: the agent's delivery phrase (for example "Wed Oct 28") rewritten as an exact date. Code compares dates.
 export type SemanticDelivery = { claimed_date: string | null; source: 'muse-spark' | 'rules-fallback' }
 
@@ -118,6 +129,7 @@ export type AuditResult = {
     agent_summary_delivery: string | null
     agent_believed_terms: string | null
     returns_summary_matches_terms: boolean | null
+    returns_comparison?: ReturnsComparison
     returns_reason: string | null
     delivery_claimed_date: string | null
     delivery_source: 'muse-spark' | 'rules-fallback' | null
@@ -329,9 +341,14 @@ export function audit(input: AuditInput): AuditResult {
       const formal = kindOfFormal(terms.formal_returns)
       const sem = input.semantic_returns
       // Does the agent's claim say what the formal terms say? Spark's answer when it gave one; otherwise the keyword reading.
-      const sameAsTerms: boolean | null = sem && sem.returns_summary_matches_terms !== null
-        ? sem.returns_summary_matches_terms
-        : (() => { const k = kindOfText(said); return k === null ? null : k === formal })()
+      // "Cannot determine" (only ever about a summary that is present) is kept as such: never a match, never a mismatch.
+      const undetermined = !!said && sem?.returns_comparison === 'cannot_determine'
+      const sameAsTerms: boolean | null = undetermined ? null
+        : sem?.returns_comparison === 'match' ? true
+          : sem?.returns_comparison === 'mismatch' ? false
+            : sem && sem.returns_summary_matches_terms !== null
+              ? sem.returns_summary_matches_terms
+              : (() => { const k = kindOfText(said); return k === null ? null : k === formal })()
       const parts = { grant: 'Returnable required', terms: terms.formal_terms_text, actual: said ? `Agent summary "${said}"` : null }
       const next = `Merchant reviews — confirm ${terms.formal_terms_text} terms with customer, or cancel / offer returnable alternative`
       if (formal === 'final_sale') {
@@ -346,6 +363,12 @@ export function audit(input: AuditInput): AuditResult {
         checks.push(check('returns', 'Returns', 'mismatch', parts, ['return_policy_required'], {
           cause: `Agent summary "${said}" misrepresented the formal terms ("${terms.formal_terms_text}")`,
           next_action: next,
+        }))
+      } else if (undetermined) {
+        // Recorded for the merchant, but not a problem: the other checks decide the verdict, as they always do.
+        checks.push(check('returns', 'Returns', 'cannot_determine', parts, ['return_policy_required'], {
+          cause: RETURNS_CANNOT_DETERMINE,
+          next_action: `Merchant reviews the Returns field — confirm ${terms.formal_terms_text} terms with customer`,
         }))
       } else {
         checks.push(check('returns', 'Returns', 'match', parts, ['return_policy_required']))
@@ -400,15 +423,21 @@ export function audit(input: AuditInput): AuditResult {
   const agent_summary = a
     ? {
       agent_summary_returns: a.agent_summary_returns, agent_summary_delivery: a.agent_summary_delivery, agent_believed_terms: a.agent_believed_returns,
-      returns_summary_matches_terms: sr ? sr.returns_summary_matches_terms : null, returns_reason: sr ? sr.reason : null,
+      returns_summary_matches_terms: sr ? sr.returns_summary_matches_terms : null,
+      // only when the three-way reader answered, so receipts sealed before this field existed hash exactly as before
+      ...(sr?.returns_comparison ? { returns_comparison: sr.returns_comparison } : {}),
+      returns_reason: sr ? sr.reason : null,
       delivery_claimed_date: sd ? sd.claimed_date : null, delivery_source: sd ? sd.source : null,
     }
     : null
 
+  const undeterminedFields = checks.filter((c) => c.result === 'cannot_determine').map((c) => c.field)
+
   return {
     decision, problems, problem_fields, missing_components, tamper_failed, checks,
     merchant_action:
-      decision === 'pass' ? 'Proceed — ship / finalize capture. No review needed.'
+      decision === 'pass' && undeterminedFields.length > 0 ? `Proceed — ship / finalize capture. Merchant review of the ${undeterminedFields.join(', ')} field: comparison cannot be determined from the summary as presented.`
+      : decision === 'pass' ? 'Proceed — ship / finalize capture. No review needed.'
         : decision === 'review_required' ? 'Do not ship yet. Merchant review needed before fulfillment.'
           : 'Do not proceed. Investigate the record or the agent first.',
     flag:
