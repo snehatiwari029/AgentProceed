@@ -171,7 +171,14 @@ function ScanSummary({ scan, suggestions }: { scan: Scan; suggestions: Suggestio
   const top = open[0]
   const topText = top ? `${CATEGORY_LABELS[top.category as Category]}s first` : 'Nothing open'
   const m = scan.markup
-  const sparkText = Object.entries(scan.spark).map(([k, n]) => `${k} on ${n}`).join(', ')
+  // Pillar deconstruction only (the Agent Read-Test has its own Spark call and its own label on each listing).
+  // Same wording as each listing's label (checks.ts), so the banner and the listing can never read differently.
+  const onSpark = scan.spark['muse-spark'] ?? 0
+  const onFallback = scan.spark['rules-fallback'] ?? 0
+  const sparkText = [
+    `Muse Spark deconstruction on ${onSpark} of ${scan.listings_scanned}`,
+    ...(onFallback > 0 ? [`rules-fallback — deterministic check only, Spark deconstruction unavailable on ${onFallback} of ${scan.listings_scanned}`] : []),
+  ].join('; ')
 
   return (
     <Card label="Scan summary">
@@ -196,7 +203,7 @@ function ScanSummary({ scan, suggestions }: { scan: Scan; suggestions: Suggestio
             ? `HTML as served at ${m.url} (HTTP ${m.http_status}, ${m.bytes} bytes). No JavaScript is run, as many crawlers read it. ${m.products_found} Product block(s) found.`
             : `not checked — ${m.error}`}
         </li>
-        <li>Semantic reading: {sparkText}. rules-fallback means deterministic check only, Spark deconstruction unavailable.</li>
+        <li>Semantic reading (pillar deconstruction): {sparkText}.</li>
       </ul>
     </Card>
   )

@@ -581,6 +581,20 @@ describe('Optimization for Agents', () => {
     expect(screen.getAllByRole('button', { name: 'Show checklist and fixes' })).toHaveLength(8)
   })
 
+  it('the scan summary names the same deconstruction source as the listings, and explains rules-fallback only when a listing used it', async () => {
+    const w = await scanned()
+    open('/dashboard/optimization')
+    await screen.findAllByTestId('optimizer-listing')
+    const spark = (w.tables.optimizer_scans[0] as { spark: Record<string, number> }).spark
+    const line = screen.getByText(/^Semantic reading \(pillar deconstruction\):/)
+    const onSpark = spark['muse-spark'] ?? 0
+    const onFallback = spark['rules-fallback'] ?? 0
+    expect(line).toHaveTextContent(`Muse Spark deconstruction on ${onSpark} of 9`)
+    if (onFallback > 0) expect(line).toHaveTextContent(`rules-fallback — deterministic check only, Spark deconstruction unavailable on ${onFallback} of 9`)
+    else expect(line).not.toHaveTextContent(/rules-fallback/)
+    expect(line).not.toHaveTextContent(/muse-spark on/)
+  })
+
   it('shows no Order check linkage: no order numbers, mismatch counts, "linked to" tags or caused-mismatch filter', async () => {
     const user = userEvent.setup()
     await scanned({ agent: scriptedAgent() }) // with Agent read-test answers on the page too
