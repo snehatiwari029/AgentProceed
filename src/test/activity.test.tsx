@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -160,7 +160,8 @@ describe('Agent activity page on the demo seed', () => {
     expect(container.querySelectorAll('[data-agent-icon]')).toHaveLength(seededSessions)
     expect(container.querySelector('[data-agent-icon="other-merchant"]')).toBeNull()
     expect(screen.getByTestId('activity-summary')).toHaveTextContent(`${seededSessions} in store`)
-    expect(screen.getByRole('link', { name: 'Agent activity' })).toBeInTheDocument()
+    // The standalone view stays reachable by URL; it is no longer in the navigation (it is embedded on the home page).
+    expect(within(screen.getByRole('navigation', { name: 'Dashboard' })).queryByRole('link', { name: 'Agent activity' })).not.toBeInTheDocument()
 
     // The 12322 row has a receipt: clicking it opens that order's existing check in Agent orders.
     await user.click(screen.getByRole('button', { name: /order 12322, open in Agent orders/ }))

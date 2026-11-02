@@ -18,7 +18,7 @@ beforeEach(() => { insert.mockReset(); insert.mockResolvedValue({ error: null })
 describe('Home page', () => {
   it('hero: headline, subheadline, Login for demo, See how it works, and the receipt image kept', () => {
     home()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Trust layer for\s*agentic\s*shopping/)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Everything merchants need to sell confidently when the shopper is an AI agent.')
     expect(screen.getByText(/As your customers are changing from humans to agents/)).toBeInTheDocument()
     for (const a of screen.getAllByRole('link', { name: /Login for demo/ })) expect(a).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: /See how it works/ })).toHaveAttribute('href', '#how-it-works')
@@ -44,6 +44,7 @@ describe('Home page', () => {
     expect(within(nav).getByRole('link', { name: 'Products' })).toHaveAttribute('href', '/products')
     expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '#faq')
     expect(within(nav).getByRole('link', { name: 'Pilot' })).toHaveAttribute('href', '#pilot')
+    expect(within(nav).getByRole('link', { name: 'Hackathon' })).toHaveAttribute('href', '/hackathon')
     expect(within(nav).getByRole('link', { name: /Login for demo/ })).toHaveAttribute('href', '/dashboard')
     for (const id of ['how-it-works', 'faq', 'pilot']) expect(document.getElementById(id)).not.toBeNull()
   })
@@ -54,9 +55,9 @@ describe('Home page', () => {
     expect(screen.getByText(/it's he-said-she-said, and you lose\./)).toBeInTheDocument()
   })
 
-  it('What we do for you: three cards in order, the third is "Improve it" (no "Fix it")', () => {
+  it('What we do for you: four feature entries in order, ending with the Agent Activity tracker (no "Fix it")', () => {
     home()
-    const titles = ['Catch it before you ship', 'Prove it if it disputes anyway', 'Improve it']
+    const titles = ['Catch it before you ship', 'Improve it', 'Prove it if it disputes anyway', 'See every agent in your store.']
     const found = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
     const idx = titles.map((t) => found.indexOf(t))
     expect(idx.every((i) => i >= 0)).toBe(true)
@@ -76,11 +77,13 @@ describe('Home page', () => {
     expect(screen.getByText(/returns a signal, it does not block checkout itself/)).toBeInTheDocument()
   })
 
-  it('Products block on the home page lists exactly 3 tools, each linking to the Products page', () => {
+  it('Products block on the home page lists exactly 4 tools, each linking to the Products page', () => {
     home()
     const section = document.getElementById('products') as HTMLElement
     const tools = within(section).getAllByRole('heading', { level: 3 })
-    expect(tools.map((t) => t.textContent)).toEqual(['Agent Receipt', 'Evidence Packet', 'Listing Optimizer + Read as Agent'])
+    expect(tools.map((t) => t.textContent)).toEqual(['Agent Receipt', 'Listing Optimizer + Read as Agent', 'Evidence Packet', 'Agent Activity tracker'])
+    expect(within(section).getByRole('heading', { level: 2 })).toHaveTextContent('Four tools. One record.')
+    expect(within(section).getByRole('link', { name: 'Agent Activity tracker' })).toHaveAttribute('href', '/products#agent-activity')
     expect(within(section).getByRole('link', { name: 'Agent Receipt' })).toHaveAttribute('href', '/products#order-check')
   })
 
@@ -94,7 +97,7 @@ describe('Home page', () => {
     await user.click(screen.getByRole('button', { name: 'Can agents make errors?' }))
     expect(screen.getByText(/Those errors become the merchant's chargebacks and returns/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'What are the products / features offered?' }))
-    expect(screen.getAllByRole('link', { name: /Details → Products page/ })).toHaveLength(3)
+    expect(screen.getAllByRole('link', { name: /Details → Products page/ })).toHaveLength(4)
     expect(screen.queryByText(/What do I actually do when an order is flagged/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Pilot offer/)).not.toBeInTheDocument()
   })
@@ -141,11 +144,11 @@ describe('Home page', () => {
 })
 
 describe('Products page', () => {
-  it('has exactly three products with two paragraphs each', () => {
+  it('has exactly four products with two paragraphs each', () => {
     const { container } = products()
     const sections = container.querySelectorAll('section.prod')
-    expect(sections).toHaveLength(3)
-    expect([...sections].map((s) => s.querySelector('h2')?.textContent)).toEqual(['Agent Receipt', 'Evidence Packet', 'Listing Optimizer + Read as Agent'])
+    expect(sections).toHaveLength(4)
+    expect([...sections].map((s) => s.querySelector('h2')?.textContent)).toEqual(['Agent Receipt', 'Listing Optimizer + Read as Agent', 'Evidence Packet', 'Agent Activity tracker'])
     for (const s of sections) expect(s.querySelectorAll('p.para')).toHaveLength(2)
     expect(screen.getByText(/This is the checkpoint merchants are missing today/)).toBeInTheDocument()
     expect(screen.getByText(/never auto-edits a product page, price, or terms/)).toBeInTheDocument()

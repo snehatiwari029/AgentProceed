@@ -14,16 +14,27 @@ export const content = {
       { label: 'Products', to: '/products' },
       { label: 'FAQ', hash: 'faq' },
       { label: 'Pilot', hash: 'pilot' },
+      { label: 'Hackathon', to: '/hackathon' },
     ] as { label: string; hash?: string; to?: string }[],
     loginLabel: 'Login for demo',
     loginTo: '/dashboard', // the merchant dashboard has its own one-tap demo sign-in
   },
 
   hero: {
-    // Headline = before + (emphasis, shown in green italic) + after. "\n" is a line break.
-    headlineBefore: 'Trust layer for\n',
-    headlineEmphasis: 'agentic',
-    headlineAfter: '\nshopping',
+    // Headline = before + (emphasis, shown in teal) + after. The Agent Proceed tagline.
+    eyebrow: 'Agent Proceed',
+    headlineBefore: 'Everything merchants need to sell confidently when the shopper is an ',
+    headlineEmphasis: 'AI agent',
+    headlineAfter: '.',
+    // The four tools, shown under the hero copy. Each links to its section on the Products page.
+    tools: [
+      { name: 'Agent Receipt', to: '/products#order-check' },
+      { name: 'Listing Optimizer + Read as Agent', to: '/products#listing-optimizer' },
+      { name: 'Evidence Packet', to: '/products#evidence-pack' },
+      { name: 'Agent Activity tracker', to: '/products#agent-activity' },
+    ],
+    // The animated scene on the left of the hero (decorative; described for screen readers).
+    sceneLabel: 'Three AI agents, each connected by a line to a merchant shop.',
     body: 'As your customers are changing from humans to agents, we help you in that transition with the tools you need to run your business successfully.',
     primaryCta: 'Login for demo',
     secondaryCta: 'See how it works',
@@ -63,21 +74,32 @@ export const content = {
     headline: 'What we do for you',
     cards: [
       {
-        tag: '01',
+        icon: 'shield',
+        tag: 'Agent Receipt',
         title: 'Catch it before you ship',
         body: "Agent orders are checked at order received, before fulfillment. If the order doesn't match what the customer authorized — budget, returns, delivery, size — it's flagged Review Required or Hold for Suspicion, and you hold shipment until you review it.",
       },
       {
-        tag: '02',
+        icon: 'package',
+        tag: 'Listing Optimizer + Read as Agent',
+        title: 'Improve it',
+        body: 'The agent audits your listings and suggests ways to structure listing for agents shopping on customer behalf to be able to read and interpret correctly.',
+      },
+      {
+        icon: 'fingerprint',
+        tag: 'Evidence Packet',
         title: 'Prove it if it disputes anyway',
         body: 'Every order gets an immutable record of intent and auth, hash-sealed, that you can download in one click as a chargeback representation package. Show grant vs action vs receipt, represent with proof, or concede early and save the chargeback fee.',
       },
       {
-        tag: '03',
-        title: 'Improve it',
-        body: 'The agent audits your listings and suggests ways to structure listing for agents shopping on customer behalf to be able to read and interpret correctly.',
+        icon: 'bot',
+        tag: 'Agent Activity tracker',
+        title: 'See every agent in your store.',
+        body: 'The Agent Activity map shows every agent session at its pipeline stage: session opened, grant recorded, proposal presented, order placed or verdict issued. Each bot icon is a real session record, with a verdict badge for its receipt. Icons move only when a stored record changes, and the map refreshes every 20 seconds.',
+        image: { src: '/features/agent-activity-map.jpg', alt: 'The Agent Activity map in the merchant dashboard: a stylized store with seven agent sessions at the checkout line, each with a verdict badge, labelled as simulated agent traffic for Northwind Outfitters.' },
+        cta: { label: 'See it in the dashboard', to: '/dashboard' },
       },
-    ],
+    ] as { icon: string; tag: string; title: string; body: string; image?: { src: string; alt: string }; cta?: { label: string; to: string } }[],
   },
 
   steps: {
@@ -94,23 +116,24 @@ export const content = {
     note: 'Agent Receipt returns a signal, it does not block checkout itself — your order system holds shipment based on that signal. It shows mismatch facts only, it does not decide liability.',
   },
 
-  // Home page Products block: exactly three tools. The long explanations are on the Products page (below).
+  // Home page Products block: exactly four tools. The long explanations are on the Products page (below).
   productsHome: {
     id: 'products',
     eyebrow: 'Products',
-    headline: 'Three tools. One record.',
+    headline: 'Four tools. One record.',
     moreLabel: 'See all products',
     moreTo: '/products',
   },
 
-  // The Products page (/products): exactly three products, two paragraphs each.
+  // The Products page (/products): exactly four products, two paragraphs each.
   products: {
     eyebrow: 'Products',
-    headline: 'Three products, one record.',
-    intro: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent. Agent Receipt checks orders before you ship, Evidence Packet proves it if it disputes anyway, and Listing Optimizer + Read as Agent make sure agents read your listings correctly.',
+    headline: 'Four products, one record.',
+    intro: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent. Agent Receipt checks orders before you ship, Listing Optimizer + Read as Agent make sure agents read your listings correctly, Evidence Packet proves it if it disputes anyway, and the Agent Activity tracker shows every agent in your store.',
     items: [
       {
         id: 'order-check',
+        icon: 'shield',
         title: 'Agent Receipt',
         short: 'Catches mismatches before fulfillment.',
         paras: [
@@ -119,7 +142,18 @@ export const content = {
         ],
       },
       {
+        id: 'listing-optimizer',
+        icon: 'package',
+        title: 'Listing Optimizer + Read as Agent',
+        short: 'Listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.',
+        paras: [
+          'Listing Optimizer reviews every listing and provides a summary of what\'s missing for an agent to view it — details, metadata, and terms in a form agents can parse, filter, and compare without friction. Listings without details and metadata are skipped by agents, even if a human shopper would see them. Read as Agent shows how a shopping agent reads each listing as shoppers see it, without your formal terms.',
+          'Fixing those gaps does two things: it prevents mismatches like a page that says "Easy returns" while formal terms are Final Sale, or a total including expedited shipping that isn\'t shown before confirmation, and it helps agents find and understand more of your catalogue, so fewer listings are skipped and chances of conversion increase. These are recommendations only, and the merchant approves every fix — Agent Proceed never auto-edits a product page, price, or terms on its own.',
+        ],
+      },
+      {
         id: 'evidence-pack',
+        icon: 'fingerprint',
         title: 'Evidence Packet',
         short: 'A downloadable Evidence Packet for a disputed shipped order.',
         paras: [
@@ -128,15 +162,18 @@ export const content = {
         ],
       },
       {
-        id: 'listing-optimizer',
-        title: 'Listing Optimizer + Read as Agent',
-        short: 'Listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.',
+        id: 'agent-activity',
+        icon: 'bot',
+        title: 'Agent Activity tracker',
+        short: 'See every agent in your store.',
         paras: [
-          'Listing Optimizer reviews every listing and provides a summary of what\'s missing for an agent to view it — details, metadata, and terms in a form agents can parse, filter, and compare without friction. Listings without details and metadata are skipped by agents, even if a human shopper would see them. Read as Agent shows how a shopping agent reads each listing as shoppers see it, without your formal terms.',
-          'Fixing those gaps does two things: it prevents mismatches like a page that says "Easy returns" while formal terms are Final Sale, or a total including expedited shipping that isn\'t shown before confirmation, and it helps agents find and understand more of your catalogue, so fewer listings are skipped and chances of conversion increase. These are recommendations only, and the merchant approves every fix — Agent Proceed never auto-edits a product page, price, or terms on its own.',
+          'The Agent Activity map shows every agent session at its pipeline stage: session opened, grant recorded, proposal presented, order placed or verdict issued. Each bot icon is a real session record, with a verdict badge for its receipt. Icons move only when a stored record changes, and the map refreshes every 20 seconds.',
+          "It lives in the merchant dashboard next to Agent orders. It is read-only and shows pipeline stage, not live browsing, and it is not the merchant's floorplan or a camera view. In the demo, the traffic is simulated agent traffic for Northwind Outfitters.",
         ],
+        image: { src: '/features/agent-activity-map.jpg', alt: 'The Agent Activity map in the merchant dashboard, labelled as simulated agent traffic for Northwind Outfitters.' },
+        cta: { label: 'See it in the dashboard', to: '/dashboard' },
       },
-    ],
+    ] as { id: string; icon: string; title: string; short: string; paras: string[]; image?: { src: string; alt: string }; cta?: { label: string; to: string } }[],
     ctaTitle: 'Want this on your store?',
     ctaLabel: 'Reach out for pilot',
   },
@@ -192,8 +229,9 @@ export const content = {
         q: 'What are the products / features offered?',
         a: [
           { t: 'Agent Receipt — catches mismatches before fulfillment.', to: '/products#order-check', toLabel: 'Details → Products page' },
-          { t: 'Evidence Packet — downloadable Evidence Packet for a disputed shipped order.', to: '/products#evidence-pack', toLabel: 'Details → Products page' },
           { t: 'Listing Optimizer + Read as Agent — listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.', to: '/products#listing-optimizer', toLabel: 'Details → Products page' },
+          { t: 'Evidence Packet — downloadable Evidence Packet for a disputed shipped order.', to: '/products#evidence-pack', toLabel: 'Details → Products page' },
+          { t: 'Agent Activity tracker — see every agent in your store, at its pipeline stage, in the merchant dashboard.', to: '/products#agent-activity', toLabel: 'Details → Products page' },
         ],
       },
     ] as { q: string; a: FaqLine[] }[],
@@ -220,6 +258,29 @@ export const content = {
     success: 'Thanks. We have your request and will be in touch.',
     error: 'Sorry, that did not send. Please try again.',
     privacy: 'We use these details only to reply to your request.', // PLACEHOLDER: confirm wording
+  },
+
+  // The Hackathon page (/hackathon): a demo launchpad for judges.
+  hackathon: {
+    eyebrow: 'Hackathon demo',
+    headline: 'Try Agent Proceed in two minutes.',
+    tagline: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent.',
+    demos: [
+      { title: 'Chat with the shopper agent', to: '/chat', note: 'Muse, a shopping agent, buys from the Northwind Outfitters demo store for you.' },
+      { title: 'Demo store', to: '/shop', note: 'Northwind Outfitters: the store the agent shops in, as a shopper or an agent sees it.' },
+      { title: 'Merchant dashboard', to: '/dashboard', note: 'The demo sign-in is pre-filled for Northwind Outfitters: one tap, no password.' },
+    ],
+    repoLabel: 'Source code on GitHub',
+    repoUrl: 'https://github.com/snehatiwari029/AgentReceipt',
+    tryTitle: 'What to try',
+    trySteps: [
+      { title: 'Chat', text: 'Open the chat, tap "Try the demo test sequence" and send it. Muse finds a snowboard and places the order.' },
+      { title: 'Store', text: 'Open the store and find the snowboard Muse picked. Compare its listing with what Muse told the customer.' },
+      { title: 'Dashboard: agent activity map', text: 'Sign in to the dashboard and open Agent activity from the sidebar. The new session is a bot at the checkout line, with a verdict badge for its receipt.' },
+      { title: 'Dashboard attention', text: 'Back on the dashboard home, "Orders requiring attention" now includes the new order, read live.' },
+      { title: 'Mismatch', text: 'In Agent orders, open the new order and click Show check: the total including shipping is over the budget, and "easy returns" does not match Final Sale terms.' },
+    ],
+    note: 'Demo: simulated store and simulated payments. Each chat order is a real demo order in the dashboard.',
   },
 
   footer: {

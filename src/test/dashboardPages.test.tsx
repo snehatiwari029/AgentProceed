@@ -106,7 +106,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(screen.getByText(/VI-aligned demo representation/)).toBeInTheDocument()
   })
 
-  it('Home shows the 4 stat cards in one row; Orders requiring attention is live (Review Required + Hold for Suspicion only) and links to the orders page', async () => {
+  it('Home: 2x2 grid; demo values labelled Demo; Orders requiring attention is live (Review Required + Hold for Suspicion only) and links to the orders page', async () => {
     open('/dashboard')
     const card = await screen.findByTestId('stat-attention')
     expect(card).toHaveAttribute('href', '/dashboard/orders')
@@ -115,9 +115,21 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(screen.getByTestId('stat-store-health')).toHaveTextContent('86/100')
     expect(screen.getByTestId('stat-profit')).toHaveTextContent('$18,400')
     expect(screen.getByTestId('stat-agent-profit')).toHaveTextContent('$7,920 (43%)')
-    const row = screen.getByRole('region', { name: 'Store summary' })
-    expect(row.children).toHaveLength(4)
-    expect(row.className).toMatch(/lg:grid-cols-4/)
+    for (const id of ['stat-store-health', 'stat-profit', 'stat-agent-profit', 'stat-returns']) expect(screen.getByTestId(id).querySelector('[data-tag="demo"]')).not.toBeNull()
+    for (const id of ['stat-total-orders', 'stat-chargebacks', 'stat-catalog']) expect(screen.getByTestId(id).querySelector('[data-tag="live"]')).not.toBeNull()
+    // seed: receipts 0041, 12322, 13422 plus the 14522 gap = 4 orders; one dispute (13422) = 1 chargeback, Won = no open dispute.
+    await vi.waitFor(() => expect(screen.getByTestId('stat-total-orders')).toHaveTextContent(/^Total Agent orders4/))
+    expect(screen.getByTestId('stat-chargebacks')).toHaveTextContent(/^Chargebacks1/)
+    expect(screen.getByTestId('stat-received')).toHaveTextContent(/^Received2/)
+    expect(screen.getByTestId('stat-fulfilment')).toHaveTextContent(/^Fulfilment/)
+    expect(screen.getByTestId('action-orders')).toHaveAttribute('href', '/dashboard/orders')
+    expect(screen.getByTestId('action-orders')).toHaveTextContent(/2/)
+    expect(screen.getByTestId('action-listings')).toHaveAttribute('href', '/dashboard/optimization')
+    expect(screen.getByTestId('action-disputes')).toHaveAttribute('href', '/dashboard/disputes')
+    await vi.waitFor(() => expect(screen.getByTestId('action-disputes')).toHaveTextContent(/0/))
+    expect(within(screen.getByTestId('attention-list')).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Order 12322, open in Agent Receipt', 'Order 14522, open in Agent Receipt'])
+    expect(screen.getByTestId('activity-card').className).toMatch(/dash-standout/)
+    expect(screen.getByTestId('activity-simulated')).toHaveTextContent(/Simulated agent traffic/)
   })
 
   it('Home count follows the data: a second Review Required order makes it 3', async () => {

@@ -12,7 +12,7 @@ export function PageTitle({ title, children }: { title: string; children?: React
 
 export function Card({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <section className="rounded-xl border border-dash-edge bg-dash-card p-5" aria-label={label}>
+    <section className="dash-glass rounded-2xl p-5" aria-label={label}>
       {children}
     </section>
   )
@@ -20,7 +20,7 @@ export function Card({ children, label }: { children: ReactNode; label?: string 
 
 export function Empty({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dash-edge bg-dash-card p-6">
+    <div className="dash-glass rounded-2xl p-6">
       <p className="font-semibold text-dash-ink">{title}</p>
       <p className="mt-2 max-w-xl text-sm text-dash-body">{children}</p>
     </div>
@@ -38,7 +38,7 @@ export function Live<T>({ state, children }: { state: Rows<T>; children: (rows: 
   }
   if (state.status === 'error') {
     return (
-      <div role="alert" className="rounded-xl border border-dash-violation bg-dash-card p-5">
+      <div role="alert" className="dash-glass rounded-2xl border-dash-violation p-5">
         <p className="font-semibold text-dash-ink">Could not load this data.</p>
         <p className="mt-2 break-words text-sm text-dash-violation">{state.message}</p>
       </div>

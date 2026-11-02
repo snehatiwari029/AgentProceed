@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { content as c } from './content'
 import { Arrow, Fingerprint, iconFor } from './icons'
+import HeroScene from './HeroScene'
 import { SiteFooter, SiteHeader } from './Chrome'
 import PilotForm from './PilotForm'
 import './site.css'
@@ -81,15 +82,19 @@ export default function LandingPage() {
       <main id="top">
         <section className="hero">
           <div className="wrap hero-grid">
+            <HeroScene label={h.sceneLabel} />
             <div>
+              <p className="eyebrow">{h.eyebrow}</p>
               <h1>{h.headlineBefore}<em>{h.headlineEmphasis}</em>{h.headlineAfter}</h1>
               <p className="hero-body">{h.body}</p>
+              <ul className="hero-tools" aria-label="Tools">
+                {h.tools.map((t) => <li key={t.name}><Link to={t.to}>{t.name}</Link></li>)}
+              </ul>
               <div className="hero-cta">
                 <Link className="btn" to={c.nav.loginTo}>{h.primaryCta} <Arrow /></Link>
                 <a className="link-btn" href={`#${c.steps.id}`}>{h.secondaryCta} <Arrow down /></a>
               </div>
             </div>
-            <Receipt />
           </div>
         </section>
 
@@ -98,8 +103,9 @@ export default function LandingPage() {
             <div>
               <p className="eyebrow">{c.problem.eyebrow}</p>
               <h2 id="problem-h">{c.problem.headline}</h2>
+              <p className="gap-body">{c.problem.body}</p>
             </div>
-            <p className="gap-body">{c.problem.body}</p>
+            <Receipt />
           </div>
         </section>
 
@@ -109,10 +115,15 @@ export default function LandingPage() {
             <h2 id="partner-h">{c.whatWeDo.headline}</h2>
             <div className="cols">
               {c.whatWeDo.cards.map((col) => (
-                <div className="col" key={col.tag}>
-                  <p className="col-tag">{col.tag}</p>
-                  <h3>{col.title}</h3>
-                  <p>{col.body}</p>
+                <div className={`col${col.image ? ' col-visual' : ''}`} key={col.tag} data-testid={`feature-${col.icon}`}>
+                  <div className="col-text">
+                    <span className="disc" aria-hidden="true">{iconFor(col.icon)}</span>
+                    <p className="col-tag">{col.tag}</p>
+                    <h3>{col.title}</h3>
+                    <p>{col.body}</p>
+                    {col.cta && <Link className="btn btn-sm feature-cta" to={col.cta.to}>{col.cta.label} <Arrow /></Link>}
+                  </div>
+                  {col.image && <img className="feature-shot" src={col.image.src} alt={col.image.alt} loading="lazy" />}
                 </div>
               ))}
             </div>
@@ -150,6 +161,7 @@ export default function LandingPage() {
             <div className="pcols">
               {c.products.items.map((p) => (
                 <div className="pcol" key={p.id}>
+                  <span className="disc" aria-hidden="true">{iconFor(p.icon)}</span>
                   <h3><Link to={`/products#${p.id}`}>{p.title}</Link></h3>
                   <p>{p.short}</p>
                 </div>

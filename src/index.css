@@ -10,15 +10,20 @@
   must NOT be used by anything under src/shop/ (a test enforces that).
 */
 @theme {
-  --color-dash-page-top: #0a1128;
-  --color-dash-page-bottom: #0b0f1a;
-  --color-dash-card: #16233a;
-  --color-dash-card-raised: #1e2a44;
-  --color-dash-edge: #26365e;
+  /* Agent Proceed palette, shared with the website: indigo-purple accents, cyan-teal actions, navy ink.
+     Background: deep navy blue (the logo navy family). Cards are translucent white over it (glass), so they float. */
+  --color-dash-page-top: #0d1636;
+  --color-dash-page-bottom: #070b1d;
+  --color-dash-card: rgb(255 255 255 / 0.06);
+  --color-dash-card-raised: rgb(255 255 255 / 0.11);
+  --color-dash-edge: rgb(255 255 255 / 0.13);
   --color-dash-ink: #ffffff;
-  --color-dash-body: #cbd5e1;
-  --color-dash-label: #94a3b8;
-  --color-dash-teal: #2dd4bf;
+  --color-dash-body: #d5daea;
+  --color-dash-label: #9aa3c0;
+  --color-dash-teal: #2fcbbf;
+  --color-dash-purple: #5b3df5;
+  --color-dash-lavender: #eeeafe;
+  --color-dash-navy: #14254a;
   --color-dash-violation: #f87171;
   --color-dash-attention: #fbbf24;
   /* Disputes data legend: real record values (blue) vs sample dispute-notice values (orange). */
@@ -52,11 +57,41 @@ body {
   }
 }
 
-/* Dashboard guided tour: the element the current step points at. Outline only, so nothing moves. */
-.tour-highlight {
-  outline: 3px solid var(--color-dash-teal);
-  outline-offset: 4px;
-  border-radius: 6px;
+/* Floating glass cards (dashboard). Translucent surface, blur of what is behind, and a soft lift off the background. */
+.dash-glass {
+  background: var(--color-dash-card);
+  border: 1px solid var(--color-dash-edge);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+/* The standout card (Agent activity map on the home page): light lavender from the palette. */
+.dash-standout {
+  background: rgb(238 234 254 / 0.94);
+  border: 1px solid rgb(255 255 255 / 0.6);
+  color: var(--color-dash-navy);
+  box-shadow: 0 24px 50px -20px rgb(91 61 245 / 0.55);
+}
+/* Background glows behind the glass: purple and teal from the palette, very soft, fixed. */
+.dash-glow {
+  position: fixed;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dashboard guided tour spotlight: dims the page except the feature, with a teal ring. It never blocks clicks. */
+.tour-spotlight {
+  position: fixed;
+  z-index: 40;
+  border-radius: 18px;
+  box-shadow: 0 0 0 3px var(--color-dash-teal), 0 0 0 9999px rgb(4 7 20 / 0.72);
+  pointer-events: none;
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spotlight { transition: none; }
 }
 
 /* Agent activity map: one short pulse when an agent's stage changes. No idle or continuous motion. */
