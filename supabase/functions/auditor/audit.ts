@@ -20,7 +20,7 @@ export const MERCHANT_FOOTER =
   'AgentReceipt shows mismatch facts only; it does not decide liability and no network rule moves liability on this screen.'
 export const RECOMMENDS_NOTE = 'AgentReceipt recommends review before shipping; your order system holds shipment/capture.'
 export const SUSPICION_NOTE = 'AgentReceipt recommends holding for investigation; your order system holds shipment/capture.'
-export const GAP_NOTE = 'Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)'
+export const GAP_NOTE = 'Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)'
 export const PAYMENT_REF = 'Demo Checkout'
 
 export type Decision = 'pass' | 'review_required' | 'hold_suspicion'
@@ -189,7 +189,7 @@ export function audit(input: AuditInput): AuditResult {
     return {
       decision: 'hold_suspicion', problems: 0, problem_fields: [], missing_components: [], tamper_failed: false, checks: [],
       merchant_action: 'Do not proceed. Investigate the agent first.', flag: 'Hold for Suspicion — unverified agent, no record',
-      note: SUSPICION_NOTE, gap: GAP_NOTE, semantic_source: null, suspicion_reasons: ['unverified agent, no AgentReceipt session'],
+      note: SUSPICION_NOTE, gap: GAP_NOTE, semantic_source: null, suspicion_reasons: ['unverified agent, no Agent Receipt session'],
       agent_summary: null, footer: MERCHANT_FOOTER,
     }
   }

@@ -188,7 +188,7 @@ describe('auditor: live runs on stored records', () => {
     if (r.type !== 'audit') throw new Error('expected audit')
     expect(r.audit.decision).toBe('hold_suspicion')
     expect(r.attention).toBe(true)
-    expect(r.audit.gap).toBe('Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)')
+    expect(r.audit.gap).toBe('Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)')
     expect(w.tables.receipts).toHaveLength(0)
   })
 

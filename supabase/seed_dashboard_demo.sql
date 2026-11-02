@@ -84,7 +84,7 @@ insert into sessions (id, merchant_id, detection_source, agent_id, agent_verifie
   null,
   false,
   true,
-  'Order 14522: Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)',
+  'Order 14522: Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)',
   '2026-10-26T19:00:00.000Z'::timestamptz
 );
 

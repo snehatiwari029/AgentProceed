@@ -194,7 +194,7 @@ describe('detection engine: Pass / Review Required / Hold for Suspicion', () => 
     expect(r.decision).toBe('hold_suspicion')
     expect(r.checks).toEqual([])
     expect(r.gap).toBe(GAP_NOTE)
-    expect(r.suspicion_reasons).toContain('unverified agent, no AgentReceipt session')
+    expect(r.suspicion_reasons).toContain('unverified agent, no Agent Receipt session')
     expect(requiresAttention(r.decision)).toBe(true)
   })
 
