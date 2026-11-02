@@ -18,7 +18,7 @@ beforeEach(() => { insert.mockReset(); insert.mockResolvedValue({ error: null })
 describe('Home page', () => {
   it('hero: headline, subheadline, Login for demo, See how it works, and the receipt image kept', () => {
     home()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Trust layer for\s*agentic\s*shopping/)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Everything merchants need to sell confidently when the shopper is an AI agent.')
     expect(screen.getByText(/As your customers are changing from humans to agents/)).toBeInTheDocument()
     for (const a of screen.getAllByRole('link', { name: /Login for demo/ })) expect(a).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: /See how it works/ })).toHaveAttribute('href', '#how-it-works')
@@ -44,6 +44,7 @@ describe('Home page', () => {
     expect(within(nav).getByRole('link', { name: 'Products' })).toHaveAttribute('href', '/products')
     expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '#faq')
     expect(within(nav).getByRole('link', { name: 'Pilot' })).toHaveAttribute('href', '#pilot')
+    expect(within(nav).getByRole('link', { name: 'Hackathon' })).toHaveAttribute('href', '/hackathon')
     expect(within(nav).getByRole('link', { name: /Login for demo/ })).toHaveAttribute('href', '/dashboard')
     for (const id of ['how-it-works', 'faq', 'pilot']) expect(document.getElementById(id)).not.toBeNull()
   })

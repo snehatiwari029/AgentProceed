@@ -37,8 +37,10 @@ export default function ProductsPage() {
         ))}
         <section className="prod-cta">
           <div className="wrap">
-            <h2>{p.ctaTitle}</h2>
-            <Link className="btn" to="/#pilot">{p.ctaLabel} <Arrow /></Link>
+            <div>
+              <h2>{p.ctaTitle}</h2>
+              <Link className="btn" to="/#pilot">{p.ctaLabel} <Arrow /></Link>
+            </div>
           </div>
         </section>
       </main>

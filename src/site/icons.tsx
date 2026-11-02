@@ -30,3 +30,5 @@ export const Shield = ({ size = 26 }: { size?: number }) => (
   </svg>
 )
 export const iconFor = (name: string) => (name === 'fingerprint' ? <Fingerprint /> : name === 'package' ? <Package /> : <Shield />)
+// Icon disc per tool: Agent Receipt = shield, Evidence Packet = fingerprint, Listing Optimizer + Read as Agent = package.
+export const toolIcon = (i: number) => (i === 0 ? <Shield /> : i === 1 ? <Fingerprint /> : <Package />)

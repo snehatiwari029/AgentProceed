@@ -10,10 +10,10 @@ export function SiteHeader({ onHome }: { onHome: boolean }) {
   return (
     <header className="header">
       <div className="header-in">
-        <Link className="logo" to="/" aria-label={`${c.brand} home`}><AgentProceedLogo variant="light" size={34} /></Link>
+        <Link className="logo" to="/" aria-label={`${c.brand} home`}><AgentProceedLogo variant="purple" size={32} /></Link>
         <nav className="nav" aria-label="Main">
           {c.nav.links.map((l) =>
-            l.to ? <Link key={l.label} className="nav-link" to={l.to}>{l.label}</Link>
+            l.to ? <Link key={l.label} className={`nav-link${l.to === '/hackathon' ? ' nav-keep' : ''}`} to={l.to}>{l.label}</Link>
               : <a key={l.label} className="nav-link" href={`${onHome ? '' : '/'}#${l.hash}`}>{l.label}</a>)}
           <Link className="btn btn-sm" to={c.nav.loginTo}>{c.nav.loginLabel} <Arrow /></Link>
         </nav>

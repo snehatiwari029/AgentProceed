@@ -62,7 +62,7 @@ describe('Dashboard and routing', () => {
 
   it('unknown paths fall back to the public page', () => {
     at('/nowhere')
-    expect(screen.getByRole('heading', { level: 1, name: /Trust layer for\s*agentic\s*shopping/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /Everything merchants need to sell confidently when the shopper is an AI agent/ })).toBeInTheDocument()
   })
 
   it('the old /dashboard/tamper URL renders no Tamper page: it falls back to the Dashboard home', async () => {

@@ -14,16 +14,26 @@ export const content = {
       { label: 'Products', to: '/products' },
       { label: 'FAQ', hash: 'faq' },
       { label: 'Pilot', hash: 'pilot' },
+      { label: 'Hackathon', to: '/hackathon' },
     ] as { label: string; hash?: string; to?: string }[],
     loginLabel: 'Login for demo',
     loginTo: '/dashboard', // the merchant dashboard has its own one-tap demo sign-in
   },
 
   hero: {
-    // Headline = before + (emphasis, shown in green italic) + after. "\n" is a line break.
-    headlineBefore: 'Trust layer for\n',
-    headlineEmphasis: 'agentic',
-    headlineAfter: '\nshopping',
+    // Headline = before + (emphasis, shown in teal) + after. The Agent Proceed tagline.
+    eyebrow: 'Agent Proceed',
+    headlineBefore: 'Everything merchants need to sell confidently when the shopper is an ',
+    headlineEmphasis: 'AI agent',
+    headlineAfter: '.',
+    // The three tools, shown under the hero copy. Each links to its section on the Products page.
+    tools: [
+      { name: 'Agent Receipt', to: '/products#order-check' },
+      { name: 'Listing Optimizer + Read as Agent', to: '/products#listing-optimizer' },
+      { name: 'Evidence Packet', to: '/products#evidence-pack' },
+    ],
+    // The animated scene on the left of the hero (decorative; described for screen readers).
+    sceneLabel: 'Three AI agents, each connected by a line to a merchant shop.',
     body: 'As your customers are changing from humans to agents, we help you in that transition with the tools you need to run your business successfully.',
     primaryCta: 'Login for demo',
     secondaryCta: 'See how it works',
@@ -63,17 +73,17 @@ export const content = {
     headline: 'What we do for you',
     cards: [
       {
-        tag: '01',
+        tag: 'Agent Receipt',
         title: 'Catch it before you ship',
         body: "Agent orders are checked at order received, before fulfillment. If the order doesn't match what the customer authorized — budget, returns, delivery, size — it's flagged Review Required or Hold for Suspicion, and you hold shipment until you review it.",
       },
       {
-        tag: '02',
+        tag: 'Evidence Packet',
         title: 'Prove it if it disputes anyway',
         body: 'Every order gets an immutable record of intent and auth, hash-sealed, that you can download in one click as a chargeback representation package. Show grant vs action vs receipt, represent with proof, or concede early and save the chargeback fee.',
       },
       {
-        tag: '03',
+        tag: 'Listing Optimizer + Read as Agent',
         title: 'Improve it',
         body: 'The agent audits your listings and suggests ways to structure listing for agents shopping on customer behalf to be able to read and interpret correctly.',
       },
@@ -220,6 +230,28 @@ export const content = {
     success: 'Thanks. We have your request and will be in touch.',
     error: 'Sorry, that did not send. Please try again.',
     privacy: 'We use these details only to reply to your request.', // PLACEHOLDER: confirm wording
+  },
+
+  // The Hackathon page (/hackathon): a demo launchpad for judges.
+  hackathon: {
+    eyebrow: 'Hackathon demo',
+    headline: 'Try Agent Proceed in two minutes.',
+    tagline: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent.',
+    demos: [
+      { title: 'Chat with the shopper agent', to: '/chat', note: 'Muse, a shopping agent, buys from the Northwind Outfitters demo store for you.' },
+      { title: 'Demo store', to: '/shop', note: 'Northwind Outfitters: the store the agent shops in, as a shopper or an agent sees it.' },
+      { title: 'Merchant dashboard', to: '/dashboard', note: 'The demo sign-in is pre-filled for Northwind Outfitters: one tap, no password.' },
+    ],
+    repoLabel: 'Source code on GitHub',
+    repoUrl: 'https://github.com/snehatiwari029/AgentReceipt',
+    tryTitle: 'What to try',
+    trySteps: [
+      { title: 'Chat', text: 'Open the chat, tap "Try the demo test sequence" and send it. Muse finds a snowboard and places the order.' },
+      { title: 'Store', text: 'Open the store and find the snowboard Muse picked. Compare its listing with what Muse told the customer.' },
+      { title: 'Dashboard attention', text: 'Open the dashboard. "Orders requiring attention" now includes the new order, read live.' },
+      { title: 'Mismatch', text: 'In Agent orders, open the new order and click Show check: the total including shipping is over the budget, and "easy returns" does not match Final Sale terms.' },
+    ],
+    note: 'Demo: simulated store and simulated payments. Each chat order is a real demo order in the dashboard.',
   },
 
   footer: {
