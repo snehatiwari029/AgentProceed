@@ -2,7 +2,7 @@
 // so tests run it. Runs in the `disputes` edge function with the service role. The browser never writes.
 //
 // Actions (and nothing else; this is not a general write API):
-//   record_dispute  a dispute the merchant received, as filed. Builds nothing for an order that is not an AgentReceipt order.
+//   record_dispute  a dispute the merchant received, as filed. Builds nothing for an order that is not an Agent Receipt order.
 //   record_review   Layer 2: what the merchant did after a Review Required / Hold for Suspicion flag. Appended, never edited.
 //   record_event    merchant tracking: pack downloaded, fought (submitted), conceded, investigating, outcome, dispute-time note.
 //   format_pack     Spark plain-language texts for one dispute's pack, validated; rules-fallback when Spark is unavailable.
@@ -46,7 +46,7 @@ export type Reply =
   | { type: 'pack_recorded'; event: Row; already: boolean }
   | { type: 'error'; message: string }
 
-export const NOT_AGENT_ORDER = 'Not an AgentReceipt order — no evidence package built.'
+export const NOT_AGENT_ORDER = 'Not an Agent Receipt order — no evidence package built.'
 export const ONE_DISPUTE = 'This order already has a dispute. One dispute per order is in scope for this build: the first dispute is kept unchanged and nothing was written.'
 
 const err = (message: string): Reply => ({ type: 'error', message })
@@ -113,7 +113,7 @@ export async function recordDispute(body: Row, deps: DisputesDeps): Promise<Repl
   const channel = optText(body.channel, 120)
   if (reference === false || channel === false) return err('Reference or channel is too long.')
 
-  // Step 2: did this order go through the AgentReceipt agentic order pipeline? No receipt = no pack, nothing written.
+  // Step 2: did this order go through the Agent Receipt agentic order pipeline? No receipt = no pack, nothing written.
   const receipt = await db.receiptByOrderRef(merchant.id, orderRef)
   if (!receipt) return { type: 'not_agent_order', message: NOT_AGENT_ORDER, gap: await db.gapSessionForOrder(merchant.id, orderRef) }
   const existing = await db.disputeForReceipt(receipt.id as string)
@@ -217,7 +217,7 @@ export async function recordPack(body: Row, deps: DisputesDeps): Promise<Reply> 
   const last = [...events].reverse().find((e) => e.event_type === 'pack_generated' && (e.basis as Row | null)?.processor === processor)
   if (last && (last.basis as Row).pack_hash === body.pack_hash) return { type: 'pack_recorded', event: last, already: true }
   const event = await appendChained(db, 'dispute_events', {
-    id: deps.newId(), dispute_id: rec.dispute.id, event_type: 'pack_generated', decided_by: 'AgentReceipt (pack builder)',
+    id: deps.newId(), dispute_id: rec.dispute.id, event_type: 'pack_generated', decided_by: 'Evidence Packet (pack builder)',
     basis: { processor, pack_hash: body.pack_hash, text_source: source, texts, generated_at: deps.now().toISOString() },
   })
   return { type: 'pack_recorded', event, already: false }
