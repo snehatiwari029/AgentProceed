@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { content as c } from './content'
-import { Arrow, Logo } from './icons'
+import { Arrow } from './icons'
+import { AgentProceedLogo } from '../shared/brand/Logo'
 import './site.css'
 
 // Header and footer shared by the home page and the Products page.
@@ -9,7 +10,7 @@ export function SiteHeader({ onHome }: { onHome: boolean }) {
   return (
     <header className="header">
       <div className="header-in">
-        <Link className="logo" to="/" aria-label={`${c.brand} home`}><Logo />{c.brand}</Link>
+        <Link className="logo" to="/" aria-label={`${c.brand} home`}><AgentProceedLogo variant="light" size={34} /></Link>
         <nav className="nav" aria-label="Main">
           {c.nav.links.map((l) =>
             l.to ? <Link key={l.label} className="nav-link" to={l.to}>{l.label}</Link>

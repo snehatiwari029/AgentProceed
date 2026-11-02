@@ -1,12 +1,6 @@
 // Small inline icons for the public page. Colour comes from the surrounding text colour.
 const base = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
 
-export const Logo = () => (
-  <svg width="38" height="38" viewBox="0 0 38 38" fill="none" aria-hidden="true">
-    <circle cx="19" cy="19" r="17" stroke="#3d6b5e" strokeWidth="2" />
-    <circle cx="19" cy="19" r="5.5" fill="#243840" />
-  </svg>
-)
 export const Arrow = ({ down = false }: { down?: boolean }) => (
   <svg {...base} width={20} height={20} strokeWidth={2} style={down ? { transform: 'rotate(90deg)' } : undefined}>
     <path d="M5 12h14M13 6l6 6-6 6" />

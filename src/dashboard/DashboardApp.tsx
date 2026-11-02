@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import Login from './Login'
+import { AgentProceedLogo } from '../shared/brand/Logo'
 import Home from './pages/Home'
 import AgentOrders from './pages/AgentOrders'
 import Disputes from './pages/Disputes'
@@ -39,7 +40,7 @@ export default function DashboardApp() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-dash-page-top to-dash-page-bottom text-dash-body md:flex">
       <aside className="border-b border-dash-edge bg-dash-card p-4 md:min-h-screen md:w-56 md:border-b-0 md:border-r">
-        <p className="text-lg font-bold text-dash-ink">Agent Proceed</p>
+        <p className="text-lg font-bold text-dash-ink"><AgentProceedLogo variant="dark" size={26} /></p>
         <p className="text-xs text-dash-label">Northwind Outfitters</p>
         <button
           type="button"

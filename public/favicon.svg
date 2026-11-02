@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+  <!-- Agent Proceed favicon: the mark redrawn on a 16px grid (thicker head stroke, larger arrowhead) so the arrow stays legible at 16px. -->
+  <style>.i{stroke:#14254a}.f{fill:#14254a}@media (prefers-color-scheme:dark){.i{stroke:#ffffff}.f{fill:#ffffff}}</style>
+  <rect class="i" x="1" y="7" width="10" height="8" rx="2" stroke-width="2"/>
+  <rect x="3" y="10" width="2" height="2" rx="1" fill="#2fcbbf"/>
+  <rect x="7" y="10" width="2" height="2" rx="1" fill="#2fcbbf"/>
+  <path class="i" d="M8.5 6.5 12 3" stroke-width="2"/>
+  <path class="f" d="M16 0 9.8 0.6 15.4 6.2Z"/>
+</svg>
