@@ -42,7 +42,7 @@ export default function VerdictTable({ rows }: { rows: MismatchResult[] }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-dash-label">AgentReceipt shows mismatch facts only; it does not decide liability and no network rule moves liability on this screen.</p>
+      <p className="mt-3 text-xs text-dash-label">Agent Receipt shows mismatch facts only; it does not decide liability and no network rule moves liability on this screen.</p>
     </div>
   )
 }

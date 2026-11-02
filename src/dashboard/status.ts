@@ -6,7 +6,7 @@ export const DISPUTE_STATUS: Record<DisputeEventType, string> = {
   recommendation: 'Earlier entry (not shown)', // written before the Dispute Agent build; never shown
   conceded: 'Conceded (merchant decision)',
   represented: 'Fought (submitted to acquirer)',
-  pack_generated: 'Evidence pack generated',
+  pack_generated: 'Evidence Packet generated',
   outcome_won: 'Won',
   outcome_lost: 'Lost',
   pack_downloaded: 'Pack downloaded by merchant',

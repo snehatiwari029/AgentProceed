@@ -143,7 +143,7 @@ export default function Disputes() {
         hold, Review Required, or Hold for Suspicion with no shipment do not appear here.
       </PageTitle>
       <p className="-mt-3 mb-6 max-w-3xl text-sm text-dash-body" data-testid="disputes-disclaimer">
-        AgentReceipt prepares the pack. You submit it to your acquirer, and you decide with your acquirer whether to fight or
+        Evidence Packet prepares the pack. You submit it to your acquirer, and you decide with your acquirer whether to fight or
         concede. {DISCLAIMER}
       </p>
 
@@ -337,7 +337,7 @@ function RecordDispute({ merchant, onRecorded }: { merchant: Merchant; onRecorde
       reason_code: f.reason_code, dispute_date: f.dispute_date, dispute_amount_cents: amount, processor_reference: f.processor_reference.trim() || null, channel: f.channel.trim() || null,
     })
     setBusy(false)
-    if (r.type === 'not_agent_order') setMsg({ kind: 'info', text: `${r.message}${r.gap ? ' AgentReceipt recorded a gap for this order (no receipt), so there is no record to build from.' : ''}` })
+    if (r.type === 'not_agent_order') setMsg({ kind: 'info', text: `${r.message}${r.gap ? ' Agent Receipt recorded a gap for this order (no receipt), so there is no record to build from.' : ''}` })
     else if (r.type === 'out_of_scope') setMsg({ kind: 'info', text: r.message })
     else if (r.type === 'dispute_recorded') { setMsg({ kind: 'info', text: 'Dispute recorded. The evidence package is built from this order’s record below.' }); onRecorded(r.dispute_id) }
     else if (r.type === 'error') setMsg({ kind: 'error', text: r.message })
@@ -384,7 +384,7 @@ const RESULT_TEXT: Record<string, { text: string; cls: string }> = {
   match: { text: '✓ Match', cls: 'text-dash-teal font-semibold' },
   mismatch: { text: '✕ Mismatch', cls: 'text-dash-violation font-bold' },
   unspecified: { text: '– Not specified by the customer, no check', cls: 'text-dash-label font-semibold' },
-  not_in_record: { text: '⚠ Not in AgentReceipt record', cls: 'text-dash-attention font-bold' },
+  not_in_record: { text: '⚠ Not in Agent Receipt record', cls: 'text-dash-attention font-bold' },
   in_record: { text: 'In record (merchant review)', cls: 'text-dash-ink font-semibold' },
 }
 
@@ -443,7 +443,7 @@ function DisputeDetail({ row, merchant, reload, onChanged, autoGenerate, clearAu
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-lg font-bold text-dash-ink">Order {receipt.order_ref ?? '–'} · {receipt.receipt_ref}</p>
-            <p className={`text-sm ${row.sample ? SAMPLE : 'text-dash-body'}`} data-testid="dispute-date">{d.dispute_date ? `Dispute filed ${d.dispute_date}` : `Dispute date not filed — recorded in AgentReceipt ${d.opened_at.slice(0, 10)}`} · {filed ? PROCESSOR_LABEL[filed] : 'processor not filed'} {d.reason_code ?? ''}</p>
+            <p className={`text-sm ${row.sample ? SAMPLE : 'text-dash-body'}`} data-testid="dispute-date">{d.dispute_date ? `Dispute filed ${d.dispute_date}` : `Dispute date not filed — recorded in Agent Proceed ${d.opened_at.slice(0, 10)}`} · {filed ? PROCESSOR_LABEL[filed] : 'processor not filed'} {d.reason_code ?? ''}</p>
           </div>
           <label className="text-sm">
             <span className={LABEL}>Pack format</span>
@@ -490,7 +490,7 @@ function DisputeDetail({ row, merchant, reload, onChanged, autoGenerate, clearAu
               <p className="text-sm text-dash-body">
                 <Link className="font-semibold text-dash-teal" to="/dashboard/orders">Agent orders — this order&apos;s Order check</Link>
                 {' · '}
-                <Link className="font-semibold text-dash-teal" to="/dashboard/optimization">Optimization for Agents — listing guidance</Link>
+                <Link className="font-semibold text-dash-teal" to="/dashboard/optimization">Listing Optimizer — listing guidance</Link>
               </p>
               <p className="mt-1 text-xs text-dash-label">Links are for navigation. They do not say what caused this dispute.</p>
             </Block>
@@ -519,7 +519,7 @@ function ClaimVsRecord({ pack }: { pack: Pack }) {
           <p className="mt-2 text-xs text-dash-label">The customer&apos;s description is not a network code; the condition is shown separately, as filed.</p>
         </div>
         <div className="rounded-lg border border-dash-edge p-3 text-sm">
-          <p className={LABEL}>What the AgentReceipt record shows (order record and merchant review only)</p>
+          <p className={LABEL}>What the Agent Receipt record shows (order record and merchant review only)</p>
           <ul className="mt-1 flex flex-col gap-2">
             {pack.claim_vs_record.map((e) => (
               <li key={e.element} data-element={e.element}>
@@ -565,7 +565,7 @@ function Timeline({ row, data }: { row: ListRow; data: Loaded }) {
   steps.push({
     at: d.dispute_date ?? d.opened_at, rank: 5, title: d.sample ? 'Dispute filed (sample notice)' : 'Dispute filed', dateLabel: disputeDateLabel(d), sample: d.sample === true,
     detail: `${d.reason} · ${d.processor ? PROCESSOR_LABEL[d.processor] : 'processor not filed'} ${d.reason_code ?? ''} · amount ${d.dispute_amount_cents == null ? 'not in record' : formatMoney(d.dispute_amount_cents)}`,
-    source: d.sample ? 'Sample dispute notice — not filed, not stored' : d.dispute_date ? 'Dispute record (as filed)' : 'Dispute record: the filed dispute date is not in the record; the date shown is when it was recorded in AgentReceipt',
+    source: d.sample ? 'Sample dispute notice — not filed, not stored' : d.dispute_date ? 'Dispute record (as filed)' : 'Dispute record: the filed dispute date is not in the record; the date shown is when it was recorded in Agent Proceed',
   })
   for (const e of shownEvents(data.events)) {
     if (e.event_type === 'opened') continue
@@ -619,7 +619,7 @@ function PackView({ pack, events, busy, onGenerate, merchant, dispute, onChanged
     else onChanged()
   }
   return (
-    <Block title={`Evidence package — ${pack.processor_label} field order`} testid="evidence-pack">
+    <Block title={`Evidence Packet — ${pack.processor_label} field order`} testid="evidence-pack">
       <Legend testid="legend-pack" />
       {pack.sample && <p className={`mb-2 font-bold ${SAMPLE}`} data-testid="sample-pack-label">{SAMPLE_LABEL}</p>}
       <p className="text-sm text-dash-body" data-testid="pack-explanation">{pack.texts.explanation}</p>
@@ -694,7 +694,7 @@ function Needed({ pack }: { pack: Pack }) {
           </tbody>
         </table>
       )}
-      <p className="mt-2 text-xs text-dash-label">The package is available with the information in the record. Nothing missing is filled in by AgentReceipt or by a model.</p>
+      <p className="mt-2 text-xs text-dash-label">The package is available with the information in the record. Nothing missing is filled in by Agent Proceed or by a model.</p>
     </Block>
   )
 }

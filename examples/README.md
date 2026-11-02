@@ -2,7 +2,7 @@
 
 ## External agent demo (`external-agent-demo.js`)
 
-A standalone Node script that acts as a third-party agent against the public AgentReceipt API (`docs/API.md`).
+A standalone Node script that acts as a third-party agent against the public Agent Proceed API (`docs/API.md`). Environment variable names keep the internal `AGENTRECEIPT_` prefix.
 No UI, no shopper chat, no seeded data. Node 18+ (built-in `fetch`), no dependencies to install.
 
 ### Run it

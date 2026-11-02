@@ -40,7 +40,7 @@ export default function Optimization() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle title="Optimization for Agents">
+      <PageTitle title="Listing Optimizer">
         What an agent shopping for a customer cannot find, parse or compare in your listings, and the fix for each.
         You approve every fix; nothing here edits a listing, price, term or page.
       </PageTitle>
@@ -328,8 +328,8 @@ const READ_STYLE: Record<ReadResult, string> = { match: 'text-dash-teal', mismat
 // the result. The two are shown in separate columns so an agent answer is never read as part of the terms.
 function AgentReadTest({ test }: { test: ReadTest }) {
   return (
-    <section aria-label="Agent read-test" data-testid="agent-read-test" className="rounded-lg border border-dash-edge p-3">
-      <p className="font-semibold text-dash-ink">Agent read-test</p>
+    <section aria-label="Read as Agent" data-testid="agent-read-test" className="rounded-lg border border-dash-edge p-3">
+      <p className="font-semibold text-dash-ink">Read as Agent</p>
       <p className="mt-1 text-xs text-dash-label">
         A shopping agent read this listing as shoppers see it, without your formal terms, and answered four fixed questions.
         Code compared each answer with your formal terms. Nothing here changes your listing.

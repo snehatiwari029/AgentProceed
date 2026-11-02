@@ -1,4 +1,6 @@
-# AgentReceipt public agent API (hackathon slice)
+# Agent Proceed public agent API (hackathon slice)
+
+The API writes the same Agent Receipt records as the shopper agent. Environment variable names and the API's own response text keep the internal `AgentReceipt` name.
 
 A third-party agent registers, opens a session at the demo merchant, registers the customer's grant, logs what it did,
 and reads back the auditor's verdict and hash-chained receipt. The verdict comes from the same auditor the phone
