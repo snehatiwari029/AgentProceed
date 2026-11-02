@@ -27,7 +27,7 @@ const esc = (v: unknown) =>
   String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const RESULT: Record<string, string> = {
-  match: 'Match', mismatch: 'Mismatch', unspecified: 'Not specified by the customer — no check', not_in_record: 'Not in AgentReceipt record', in_record: 'In record (merchant review)', missing: 'Record missing',
+  match: 'Match', mismatch: 'Mismatch', unspecified: 'Not specified by the customer — no check', not_in_record: 'Not in Agent Receipt record', in_record: 'In record (merchant review)', missing: 'Record missing',
   cannot_determine: 'Cannot determine from summary as presented — merchant review required for that field',
 }
 
@@ -43,7 +43,7 @@ export function packToHtml(pack: Pack, events: DisputeEvent[]): string {
     `<table><tr><th>Field</th><th>Grant</th><th>Merchant terms</th><th>Actual</th><th>Match</th><th>Cause</th><th>Next action / Who acts</th></tr>${rows
       .map((r) => `<tr><td>${esc(r.field)}</td><td>${esc(r.grant ?? '–')}</td><td>${esc(r.merchant_terms ?? '–')}</td><td>${esc(r.actual ?? '–')}</td><td>${esc(RESULT[r.result] ?? r.result)}</td><td>${esc(r.cause ?? '–')}</td><td>${esc(r.next_action_who ?? '–')}</td></tr>`)
       .join('')}</table>`
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Evidence pack ${esc(p.order_ref ?? p.receipt_ref)} — ${esc(p.processor_label)}</title>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Evidence Packet ${esc(p.order_ref ?? p.receipt_ref)} — ${esc(p.processor_label)}</title>
 <style>body{font:13px/1.45 system-ui,sans-serif;color:#111;background:#fff;margin:24px;max-width:960px}h1{font-size:20px}h2{font-size:15px;margin-top:22px;border-bottom:1px solid #999}
 table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}th{width:32%;background:#f4f4f4}
 .mono{font-family:ui-monospace,monospace;word-break:break-all}.warn{border:2px solid #b00;padding:8px}
@@ -51,7 +51,7 @@ table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #c
 .legend{border:1px solid #999;padding:6px 8px;margin:8px 0}.tone-record{border-left:5px solid #1d4ed8;padding-left:8px}.tone-sample{border-left:5px solid #c2410c;padding-left:8px}</style></head><body>
 <div class="legend"><p><b class="real">Blue</b> = real data from the transaction record. <b class="sample">Orange</b> = sample data — what we would receive from merchant dispute records when the store is connected.</p><p><span class="miss">Missing</span> = not in the record; each missing item says where to obtain it.</p></div>
 ${p.sample ? `<p class="warn sample"><b>${esc(SAMPLE_LABEL)}</b></p>` : ''}
-<h1>Evidence pack — ${esc(p.processor_label)} format</h1>
+<h1>Evidence Packet — ${esc(p.processor_label)} format</h1>
 <p>Order ${esc(p.order_ref ?? '–')} · Receipt ${esc(p.receipt_ref)} · Merchant ${esc(p.merchant)}</p>
 <p><b>${esc(p.disclaimer)}</b></p>
 ${p.trusted ? '' : `<p class="warn">${esc(p.tamper_line)}</p>`}

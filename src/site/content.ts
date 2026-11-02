@@ -6,7 +6,7 @@
 export type FaqLine = { t: string; to?: string; toLabel?: string }
 
 export const content = {
-  brand: 'AgentReceipt',
+  brand: 'Agent Proceed',
 
   nav: {
     links: [
@@ -47,8 +47,8 @@ export const content = {
       sideNote: 'not a verdict.',
     },
     tags: [
-      { merchant: 'Merchant 1 not using AgentReceipt', outcome: 'Order Fulfilled, Chargeback Received', tone: 'bad' },
-      { merchant: 'Merchant 2 using AgentReceipt', outcome: 'Order Held and Confirmed, Chargeback Prevented', tone: 'good' },
+      { merchant: 'Merchant 1 not using Agent Proceed', outcome: 'Order Fulfilled, Chargeback Received', tone: 'bad' },
+      { merchant: 'Merchant 2 using Agent Proceed', outcome: 'Order Held and Confirmed, Chargeback Prevented', tone: 'good' },
     ] as { merchant: string; outcome: string; tone: 'good' | 'bad' }[],
   },
 
@@ -91,7 +91,7 @@ export const content = {
       { num: '02', text: 'What the agent actually ordered', icon: 'package' },
       { num: '03', text: 'Ship, Review required or Hold decision', icon: 'shield' },
     ],
-    note: 'AgentReceipt returns a signal, it does not block checkout itself — your order system holds shipment based on that signal. It shows mismatch facts only, it does not decide liability.',
+    note: 'Agent Receipt returns a signal, it does not block checkout itself — your order system holds shipment based on that signal. It shows mismatch facts only, it does not decide liability.',
   },
 
   // Home page Products block: exactly three tools. The long explanations are on the Products page (below).
@@ -107,11 +107,11 @@ export const content = {
   products: {
     eyebrow: 'Products',
     headline: 'Three products, one record.',
-    intro: 'Order check before you ship, an evidence pack if it disputes anyway, and a listing optimizer so agents read your listings correctly.',
+    intro: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent. Agent Receipt checks orders before you ship, Evidence Packet proves it if it disputes anyway, and Listing Optimizer + Read as Agent make sure agents read your listings correctly.',
     items: [
       {
         id: 'order-check',
-        title: 'Order check',
+        title: 'Agent Receipt',
         short: 'Catches mismatches before fulfillment.',
         paras: [
           "Agent orders are checked at order received, before fulfillment, against what the customer actually authorized — budget including shipping, returns, delivery date, size, and product scope. If the agent's order doesn't match, it's flagged Review Required when the record is trustworthy but a field mismatches, or Hold for Suspicion when the record itself can't be trusted.",
@@ -120,8 +120,8 @@ export const content = {
       },
       {
         id: 'evidence-pack',
-        title: 'Evidence pack',
-        short: 'A downloadable evidence pack for a disputed shipped order.',
+        title: 'Evidence Packet',
+        short: 'A downloadable Evidence Packet for a disputed shipped order.',
         paras: [
           'For a separate shipped order that later disputes, the immutable record of intent and auth — grant, action, formal terms, and hash-chained receipt, stored as fields only with no full customer chat — is transformed in one click into a downloadable chargeback representation package. It maps grant, action, receipt chain, and verdict to compelling-evidence fields.',
           "That saves the merchant from fighting blind or conceding by default. With grant vs action vs receipt in one pack, you can represent with proof when the order was authorized, or concede early and save the chargeback fee when the evidence doesn't support it — instead of spending manual review time assembling evidence order by order.",
@@ -129,11 +129,11 @@ export const content = {
       },
       {
         id: 'listing-optimizer',
-        title: 'Listing optimizer',
+        title: 'Listing Optimizer + Read as Agent',
         short: 'Listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.',
         paras: [
-          'The listing optimizer reviews every listing and provides a summary of what\'s missing for an agent to view it — details, metadata, and terms in a form agents can parse, filter, and compare without friction. Listings without details and metadata are skipped by agents, even if a human shopper would see them.',
-          'Fixing those gaps does two things: it prevents mismatches like a page that says "Easy returns" while formal terms are Final Sale, or a total including expedited shipping that isn\'t shown before confirmation, and it helps agents find and understand more of your catalogue, so fewer listings are skipped and chances of conversion increase. These are recommendations only, and the merchant approves every fix — AgentReceipt never auto-edits a product page, price, or terms on its own.',
+          'Listing Optimizer reviews every listing and provides a summary of what\'s missing for an agent to view it — details, metadata, and terms in a form agents can parse, filter, and compare without friction. Listings without details and metadata are skipped by agents, even if a human shopper would see them. Read as Agent shows how a shopping agent reads each listing as shoppers see it, without your formal terms.',
+          'Fixing those gaps does two things: it prevents mismatches like a page that says "Easy returns" while formal terms are Final Sale, or a total including expedited shipping that isn\'t shown before confirmation, and it helps agents find and understand more of your catalogue, so fewer listings are skipped and chances of conversion increase. These are recommendations only, and the merchant approves every fix — Agent Proceed never auto-edits a product page, price, or terms on its own.',
         ],
       },
     ],
@@ -151,11 +151,11 @@ export const content = {
         q: 'Can agents make errors?',
         a: [
           { t: "Yes. Agents can make errors from misinterpreting the user's need to overstepping to misunderstanding marketing summaries and formal terms." },
-          { t: "Those errors become the merchant's chargebacks and returns — AgentReceipt catches them before fulfillment." },
+          { t: "Those errors become the merchant's chargebacks and returns — Agent Receipt catches them before fulfillment." },
         ],
       },
       {
-        q: 'How does AgentReceipt fit into my existing order flow?',
+        q: 'How does Agent Proceed fit into my existing order flow?',
         a: [
           { t: 'It sits between agent order and fulfillment, as a checkpoint — it checks the order, returns a signal, and your system holds shipment on that signal.' },
           { t: 'It does not replace your checkout, payment, or order system.' },
@@ -164,7 +164,7 @@ export const content = {
       {
         q: 'How does it connect to my Shopify store?',
         a: [
-          { t: 'AgentReceipt does not replace your Shopify checkout, payment, or fulfillment — it checks orders after they are placed, before fulfillment, and returns a Ship / Hold signal to your dashboard.' },
+          { t: 'Agent Proceed does not replace your Shopify checkout, payment, or fulfillment — it checks orders after they are placed, before fulfillment, and returns a Ship / Hold signal to your dashboard.' },
         ],
       },
       {
@@ -191,9 +191,9 @@ export const content = {
       {
         q: 'What are the products / features offered?',
         a: [
-          { t: 'Order check — catches mismatches before fulfillment.', to: '/products#order-check', toLabel: 'Details → Products page' },
-          { t: 'Evidence pack — downloadable evidence pack for a disputed shipped order.', to: '/products#evidence-pack', toLabel: 'Details → Products page' },
-          { t: 'Listing optimizer — listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.', to: '/products#listing-optimizer', toLabel: 'Details → Products page' },
+          { t: 'Agent Receipt — catches mismatches before fulfillment.', to: '/products#order-check', toLabel: 'Details → Products page' },
+          { t: 'Evidence Packet — downloadable Evidence Packet for a disputed shipped order.', to: '/products#evidence-pack', toLabel: 'Details → Products page' },
+          { t: 'Listing Optimizer + Read as Agent — listing fixes from mismatch data and agentic-retrieval gaps, merchant-approved only.', to: '/products#listing-optimizer', toLabel: 'Details → Products page' },
         ],
       },
     ] as { q: string; a: FaqLine[] }[],
@@ -223,7 +223,7 @@ export const content = {
   },
 
   footer: {
-    line: 'AgentReceipt — Trust layer for agentic shopping.',
+    line: 'Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent.',
     links: [
       { label: 'LinkedIn', href: 'https://www.linkedin.com/in/snehatiwari02', external: true },
       { label: 'Dashboard', href: '/dashboard', external: false },

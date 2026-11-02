@@ -183,7 +183,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(colour).toHaveTextContent('Grant: not specified by the customer · Actual: no colour recorded for this order')
     expect(colour).not.toHaveTextContent(/not authorised|Agent bought a colour/)
     const tl = within(detail).getByTestId('timeline').textContent ?? ''
-    for (const s of ['Grant sealed', 'Action', 'Verdict', 'No merchant review record', 'Shipped 2026-10-27 · delivered 2026-10-29 · delivery proof missing', 'Dispute filed', 'Evidence pack generated', 'Fought (submitted to acquirer)', 'Date 2026-11-01', 'Won', 'Date 2026-11-02']) expect(tl).toContain(s)
+    for (const s of ['Grant sealed', 'Action', 'Verdict', 'No merchant review record', 'Shipped 2026-10-27 · delivered 2026-10-29 · delivery proof missing', 'Dispute filed', 'Evidence Packet generated', 'Fought (submitted to acquirer)', 'Date 2026-11-01', 'Won', 'Date 2026-11-02']) expect(tl).toContain(s)
     expect(tl.indexOf('Shipped')).toBeLessThan(tl.indexOf('Dispute filed'))
     expect(tl.indexOf('Dispute filed')).toBeLessThan(tl.indexOf('Fought'))
     const packEl = within(detail).getByTestId('evidence-pack')
@@ -336,7 +336,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     const titles = [...within(detail).getByTestId('timeline').querySelectorAll('li > span:first-child')].map((x) => x.textContent)
     expect(titles).toEqual(['Grant sealed', 'Action', 'Verdict', 'Merchant review', 'Shipment', 'Dispute filed', 'Fought (submitted to acquirer)', 'Won'])
     // 4. one answer for the dispute date: not filed, recorded on Oct 26 — in the header, the timeline and the pack
-    expect(within(detail).getByTestId('dispute-date')).toHaveTextContent('Dispute date not filed — recorded in AgentReceipt 2026-10-26')
+    expect(within(detail).getByTestId('dispute-date')).toHaveTextContent('Dispute date not filed — recorded in Agent Proceed 2026-10-26')
     const filedStep = [...within(detail).getByTestId('timeline').querySelectorAll('li')].find((li) => li.textContent!.startsWith('Dispute filed'))!
     expect(filedStep).toHaveTextContent(/^Dispute filed\s*dispute date not filed · recorded 2026-10-26/)
     // steps with no record show no date at all, never a borrowed one
@@ -552,7 +552,7 @@ describe('Optimization for Agents', () => {
   it('before any scan shows Scan Now and an empty state, not seeded checklist text', async () => {
     mock.tables = { merchants: NORTHWIND }
     open('/dashboard/optimization')
-    expect(await screen.findByRole('heading', { name: 'Optimization for Agents' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Listing Optimizer' })).toBeInTheDocument()
     expect(await screen.findByText('No scan yet.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Scan Now' })).toBeInTheDocument()
     expect(screen.queryByTestId('optimizer-listing')).not.toBeInTheDocument()
@@ -688,8 +688,8 @@ describe('Optimization for Agents', () => {
     await scanned({ agent: scriptedAgent() })
     open('/dashboard/optimization')
     const [spell, orca] = await screen.findAllByTestId('optimizer-listing')
-    const group = within(spell).getByRole('region', { name: 'Agent read-test' })
-    expect(within(group).getByText('Agent read-test')).toBeInTheDocument()
+    const group = within(spell).getByRole('region', { name: 'Read as Agent' })
+    expect(within(group).getByText('Read as Agent')).toBeInTheDocument()
     // Separate from the pillar checklist and from the suggested fixes.
     const checklist = within(spell).getByRole('table', { name: 'Pillar 1–5 checklist' })
     expect(checklist.contains(group)).toBe(false)
@@ -705,7 +705,7 @@ describe('Optimization for Agents', () => {
     for (const k of ['delivery', 'cost', 'colour_size']) expect(within(within(group).getByTestId(`read-test-${k}`)).getAllByRole('cell')[3]).toHaveTextContent(/^Match/)
 
     await user.click(within(orca).getByRole('button', { name: 'Show checklist and fixes' }))
-    const og = within(orca).getByRole('region', { name: 'Agent read-test' })
+    const og = within(orca).getByRole('region', { name: 'Read as Agent' })
     expect(within(og).getByTestId('read-test-all-match')).toHaveTextContent('Agent read-test: agent answers match formal terms.')
     expect(within(og).queryByTestId('read-test-customer-line')).not.toBeInTheDocument()
   })
@@ -713,7 +713,7 @@ describe('Optimization for Agents', () => {
   it('Agent read-test shows "unavailable" and no invented answer when Spark is not available', async () => {
     await scanned()
     open('/dashboard/optimization')
-    const group = within((await screen.findAllByTestId('optimizer-listing'))[0]).getByRole('region', { name: 'Agent read-test' })
+    const group = within((await screen.findAllByTestId('optimizer-listing'))[0]).getByRole('region', { name: 'Read as Agent' })
     expect(within(group).getByTestId('read-test-unavailable')).toHaveTextContent('Agent read-test unavailable — deterministic checks only. Spark read-test unavailable (no model key).')
     expect(within(group).queryByRole('table')).not.toBeInTheDocument()
     expect(within(group).queryByTestId('read-test-customer-line')).not.toBeInTheDocument()
@@ -723,7 +723,7 @@ describe('Optimization for Agents', () => {
     const w = await scanned()
     for (const r of w.tables.optimizer_scans[0].results as Record<string, unknown>[]) delete r.read_test
     open('/dashboard/optimization')
-    expect(within((await screen.findAllByTestId('optimizer-listing'))[0]).queryByRole('region', { name: 'Agent read-test' })).not.toBeInTheDocument()
+    expect(within((await screen.findAllByTestId('optimizer-listing'))[0]).queryByRole('region', { name: 'Read as Agent' })).not.toBeInTheDocument()
   })
 
   it('filters by pillar and flag type only', async () => {

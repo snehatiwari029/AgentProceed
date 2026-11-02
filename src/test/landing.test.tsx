@@ -31,9 +31,9 @@ describe('Home page', () => {
     const stage = container.querySelector('.card-stage') as HTMLElement
     const tags = stage.querySelectorAll('.tag')
     expect(tags).toHaveLength(2)
-    expect(stage).toHaveTextContent('Merchant 1 not using AgentReceipt')
+    expect(stage).toHaveTextContent('Merchant 1 not using Agent Proceed')
     expect(stage).toHaveTextContent('Order Fulfilled, Chargeback Received')
-    expect(stage).toHaveTextContent('Merchant 2 using AgentReceipt')
+    expect(stage).toHaveTextContent('Merchant 2 using Agent Proceed')
     expect(stage).toHaveTextContent('Order Held and Confirmed, Chargeback Prevented')
   })
 
@@ -80,8 +80,8 @@ describe('Home page', () => {
     home()
     const section = document.getElementById('products') as HTMLElement
     const tools = within(section).getAllByRole('heading', { level: 3 })
-    expect(tools.map((t) => t.textContent)).toEqual(['Order check', 'Evidence pack', 'Listing optimizer'])
-    expect(within(section).getByRole('link', { name: 'Order check' })).toHaveAttribute('href', '/products#order-check')
+    expect(tools.map((t) => t.textContent)).toEqual(['Agent Receipt', 'Evidence Packet', 'Listing Optimizer + Read as Agent'])
+    expect(within(section).getByRole('link', { name: 'Agent Receipt' })).toHaveAttribute('href', '/products#order-check')
   })
 
   it('FAQ: all 7 questions are visible with answers collapsed; opening one shows its answer', async () => {
@@ -107,7 +107,7 @@ describe('Home page', () => {
     expect(within(foot).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
     expect(within(foot).getByRole('link', { name: 'Store' })).toHaveAttribute('href', '/shop')
     expect(screen.queryByText(/github/i)).not.toBeInTheDocument()
-    expect(screen.getByText('AgentReceipt — Trust layer for agentic shopping.')).toBeInTheDocument()
+    expect(screen.getByText('Agent Proceed: everything merchants need to sell confidently when the shopper is an AI agent.')).toBeInTheDocument()
   })
 
   it('the pilot form has the specified fields and saves one row to pilot_requests', async () => {
@@ -145,7 +145,7 @@ describe('Products page', () => {
     const { container } = products()
     const sections = container.querySelectorAll('section.prod')
     expect(sections).toHaveLength(3)
-    expect([...sections].map((s) => s.querySelector('h2')?.textContent)).toEqual(['Order check', 'Evidence pack', 'Listing optimizer'])
+    expect([...sections].map((s) => s.querySelector('h2')?.textContent)).toEqual(['Agent Receipt', 'Evidence Packet', 'Listing Optimizer + Read as Agent'])
     for (const s of sections) expect(s.querySelectorAll('p.para')).toHaveLength(2)
     expect(screen.getByText(/This is the checkpoint merchants are missing today/)).toBeInTheDocument()
     expect(screen.getByText(/never auto-edits a product page, price, or terms/)).toBeInTheDocument()
