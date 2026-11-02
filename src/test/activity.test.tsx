@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeClient, mock, type Result } from './mockSupabase'
 import { buildSeed, MERCHANT_ID } from '../../scripts/seed-dashboard-demo'
-import { buildPositions, summary, type ActivitySession } from '../dashboard/activity'
+import { attentionCount, buildPositions, orderLine, summary, type ActivitySession } from '../dashboard/activity'
 import type { AgentAction, Grant, Proposal, Receipt } from '../shared/schemas'
 
 vi.mock('../shared/supabase', () => ({ supabase: fakeClient }))
@@ -170,6 +170,16 @@ describe('Agent activity page on the demo seed', () => {
     expect(mock.inserted).toEqual([])
   })
 
+  it('names the attention count exactly as the Dashboard card counts it (gap order included), and tells the order-less receipt apart', async () => {
+    render(<MemoryRouter initialEntries={['/dashboard/activity']}><AppRoutes /></MemoryRouter>)
+    await screen.findByTestId('store-map')
+    // seed: 12322 Review Required + 14522 Hold for Suspicion (gap) = 2, the same as the Home card test
+    expect(screen.getByTestId('activity-attention')).toHaveTextContent(/^Requiring attention: 2 \(Review Required \+ Hold for Suspicion, the same count as the Dashboard card\)/)
+    // the tamper example receipt has no order number: it reads as its receipt, not as a bare "Order –"
+    expect(screen.getByText(/Receipt AR-2026-0041 \(no order number\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/Order – ·/)).toBeNull()
+  })
+
   it('scopes every read to the demo merchant in the query, not after fetching everything', async () => {
     const { container } = render(<MemoryRouter initialEntries={['/dashboard/activity']}><AppRoutes /></MemoryRouter>)
     await screen.findByTestId('store-map')
@@ -198,5 +208,19 @@ describe('Agent activity page on the demo seed', () => {
     expect(screen.getByText(/pipeline stage, not live browsing/)).toBeInTheDocument()
     expect(screen.getByTestId('stage-legend')).toHaveTextContent('Entrance and browse aisles: session opened, no grant yet.')
     expect(screen.getByText('Stylized store layout.')).toBeInTheDocument()
+  })
+})
+
+describe('Agent activity: order line and attention count', () => {
+  it('orderLine: order with receipt, receipt without order, nothing yet', () => {
+    expect(orderLine({ order: '15002', receipt_ref: 'AR-2026-0045' })).toBe('Order 15002 · Receipt AR-2026-0045')
+    expect(orderLine({ order: '14522', receipt_ref: null })).toBe('Order 14522')
+    expect(orderLine({ order: null, receipt_ref: 'AR-2026-0041' })).toBe('Receipt AR-2026-0041 (no order number)')
+    expect(orderLine({ order: null, receipt_ref: null })).toBe('No order yet')
+  })
+
+  it('attentionCount counts Review Required and Hold for Suspicion, including the gap session', () => {
+    const ps = positions()
+    expect(attentionCount(ps)).toBe(2) // the review_required receipt + the gap (hold_suspicion)
   })
 })

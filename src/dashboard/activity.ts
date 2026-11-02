@@ -31,6 +31,8 @@ export type AgentPosition = {
   order: string | null
   // The receipt, when one exists: the Agent orders row to open.
   receipt_id: string | null
+  // The receipt reference (AR-…), so a receipt without an order number is still told apart from the others.
+  receipt_ref: string | null
   decision: Decision | null
   // Set when a receipt exists: the verdict has been issued (decision may still be null on an old receipt).
   verdict_issued: boolean
@@ -75,10 +77,10 @@ export function buildPositions(
         ...checkout.map((x) => (x as AgentAction & Stamped).created_at),
         r ? (r as Receipt & Stamped).created_at ?? r.sealed_at : null,
       )
-      const base = { session_id: s.id, agent, updated_at, order: null, receipt_id: null, decision: null, verdict_issued: false }
+      const base = { session_id: s.id, agent, updated_at, order: null, receipt_id: null, receipt_ref: null, decision: null, verdict_issued: false }
 
       if (r) {
-        return { ...base, zone: 'checkout', stage: 'Verdict issued', order: r.order_ref, receipt_id: r.id, decision: r.decision, verdict_issued: true }
+        return { ...base, zone: 'checkout', stage: 'Verdict issued', order: r.order_ref, receipt_id: r.id, receipt_ref: r.receipt_ref ?? null, decision: r.decision, verdict_issued: true }
       }
       if (s.detection_source === 'none') {
         const gap = parseGap(s.gap_note)
@@ -93,6 +95,18 @@ export function buildPositions(
       return { ...base, zone: 'browse', stage: 'Session opened' }
     })
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0))
+}
+
+// Review Required + Hold for Suspicion, counted exactly as the Dashboard's "Orders requiring attention" card counts
+// Agent orders rows (needsAttention): receipts with those decisions, plus gap orders, which are Hold for Suspicion.
+export const attentionCount = (positions: AgentPosition[]): number =>
+  positions.filter((p) => p.decision === 'review_required' || p.decision === 'hold_suspicion').length
+
+// "Order 15002", or "Receipt AR-2026-0041 (no order number)", or "No order yet".
+export function orderLine(p: Pick<AgentPosition, 'order' | 'receipt_ref'>): string {
+  if (p.order) return `Order ${p.order}${p.receipt_ref ? ` · Receipt ${p.receipt_ref}` : ''}`
+  if (p.receipt_ref) return `Receipt ${p.receipt_ref} (no order number)`
+  return 'No order yet'
 }
 
 // "3 in store: 2 browsing, 1 at checkout". Zones with nobody are left out.

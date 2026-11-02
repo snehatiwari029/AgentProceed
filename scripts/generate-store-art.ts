@@ -4,8 +4,9 @@
 // Status: RUN 2026-11-02. The call returned 200 and the image bytes came back as WebP, so the file extension is now
 // taken from the bytes. Candidate 3 was chosen (public/store-art/manifest.json). Endpoint from Meta's Muse Image docs: the single-shot POST /v1/images/generations, on the same
 // https://api.meta.ai/v1 host as the chat endpoint in supabase/functions/shopper-agent/model.ts. MUSE_IMAGE_URL overrides
-// it. The response shape is NOT verified yet: the script accepts data[0].b64_json or data[0].url and otherwise stops,
-// printing only the response's field names. Pricing is not assumed; confirm it against the project's Meta Model API
+// it. The script accepts data[0].b64_json or data[0].url and otherwise stops, printing only the
+// response's field names. It refuses to run while public/store-art/manifest.json names a chosen artwork, so the shipped
+// file is never overwritten. Pricing is not assumed; confirm it against the project's Meta Model API
 // pricing before running.
 //
 //   Set MODEL_API_KEY in the shell environment (never in a file), then:
@@ -14,7 +15,7 @@
 // Writes up to 3 candidates to public/store-art/ plus manifest.json (prompt, model, file, time). Pick the one that reads
 // clearest at dashboard size, then set STORE_ART in src/dashboard/pages/AgentActivity.tsx to its path and record the
 // choice in manifest.json. If the call fails, nothing is written: do not substitute any other image.
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export const MODEL = 'muse-image-1.0'
@@ -40,6 +41,9 @@ async function main() {
   const url = process.env.MUSE_IMAGE_URL?.trim() || DEFAULT_URL
   if (!key) throw new Error('MODEL_API_KEY is not set. Stop: Muse Image is unavailable, no artwork generated.')
   const out = join(process.cwd(), 'public', 'store-art')
+  // Never overwrite the artwork already chosen and shipped: candidate files would replace it under the same name.
+  const existing = await readFile(join(out, 'manifest.json'), 'utf8').then((t) => JSON.parse(t) as { chosen?: unknown }, () => null)
+  if (existing?.chosen) throw new Error(`public/store-art already has a chosen artwork (${String(existing.chosen)}). Stop: move it aside first if you really want new candidates.`)
   await mkdir(out, { recursive: true })
   const files: { file: string; created_at: string }[] = []
   for (let i = 1; i <= CANDIDATES; i++) {

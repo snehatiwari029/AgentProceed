@@ -4,7 +4,7 @@ import type { AgentAction, Grant, Proposal, Receipt } from '../../shared/schemas
 import { type Rows } from '../data'
 import { supabase } from '../../shared/supabase'
 import { MERCHANT_NAME } from '../disputes'
-import { buildPositions, summary, ZONES, type ActivitySession, type AgentPosition, type Zone } from '../activity'
+import { attentionCount, buildPositions, orderLine, summary, ZONES, type ActivitySession, type AgentPosition, type Zone } from '../activity'
 import { Card, Live, PageTitle } from '../components/Panel'
 import { DecisionBadge } from '../components/Badges'
 
@@ -88,7 +88,10 @@ function useActivity(): Rows<AgentPosition> {
     }
     readActivity(supabase).then(
       (rows) => !cancelled && setState({ status: 'ready', rows }),
-      (err: unknown) => !cancelled && setState({ status: 'error', message: err instanceof Error ? err.message : 'Network error' }),
+      // A failed re-read keeps the last good map (it refreshes again on the next tick); only a first read that fails shows the error.
+      (err: unknown) =>
+        !cancelled &&
+        setState((prev) => (prev.status === 'ready' ? prev : { status: 'error', message: err instanceof Error ? err.message : 'Network error' })),
     )
     return () => {
       cancelled = true
@@ -179,11 +182,11 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
                 key={z.id}
                 data-zone={z.id}
                 aria-label={`${z.label}: ${here.length}`}
-                className="absolute flex flex-col rounded-md border border-dashed border-dash-edge bg-dash-card/60 p-2"
+                className="absolute flex flex-col rounded-md border border-dashed border-dash-edge bg-dash-card/70 p-2"
                 style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
               >
-                <p className="text-xs font-semibold uppercase tracking-wider text-dash-label">
-                  {z.label} <span className="text-dash-body">({here.length})</span>
+                <p className="self-start rounded bg-dash-page-bottom/90 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-dash-ink shadow-sm">
+                  {z.label} <span className="text-dash-teal">({here.length})</span>
                 </p>
                 <ul className="mt-1 flex flex-wrap content-start gap-1.5 overflow-auto">
                   {here.map((p) => (
@@ -225,12 +228,19 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
           {summary(positions)}
         </p>
         {positions.length > 0 && (
+          <p className="mt-1 text-xs text-dash-label" data-testid="activity-attention">
+            Requiring attention: <span className="font-semibold text-dash-attention">{attentionCount(positions)}</span> (Review Required + Hold
+            for Suspicion, the same count as the Dashboard card). An order that arrived with no session record has no receipt and is
+            counted as Hold for Suspicion.
+          </p>
+        )}
+        {positions.length > 0 && (
           <ul className="mt-3 divide-y divide-dash-edge">
             {positions.map((p) => {
               const body = (
                 <>
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="truncate font-semibold text-dash-ink">{p.agent}</span>
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 break-all font-semibold text-dash-ink" title={p.agent}>{p.agent}</span>
                     <span className="shrink-0 whitespace-nowrap">
                       {p.decision ? <DecisionBadge value={p.decision} /> : p.verdict_issued ? <DecisionBadge value={null} /> : null}
                     </span>
@@ -239,7 +249,7 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
                     {ZONES.find((z) => z.id === p.zone)?.label}: {p.stage}
                   </span>
                   <span className="mt-1 block text-xs text-dash-label">
-                    Order {p.order ?? '–'} · Updated {time(p.updated_at)}
+                    {orderLine(p)} · Updated {time(p.updated_at)}
                   </span>
                 </>
               )
@@ -250,7 +260,7 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
                       type="button"
                       onClick={() => openOrder(p)}
                       className="block w-full rounded-md px-2 py-1 text-left hover:bg-dash-card-raised"
-                      aria-label={`${p.agent}, order ${p.order ?? 'without a number'}, open in Agent orders`}
+                      aria-label={`${p.agent}, ${p.order ? `order ${p.order}` : orderLine(p)}, open in Agent orders`}
                     >
                       {body}
                     </button>
