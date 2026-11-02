@@ -82,7 +82,7 @@ describe('dashboard demo seed', () => {
 
     expect(receipts.some((r) => r.order_ref === '14522')).toBe(false)
     const gap = records.find((r) => r.table === 'sessions' && r.row.detection_source === 'none')!.row
-    expect(gap.gap_note).toBe('Order 14522: Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)')
+    expect(gap.gap_note).toBe('Order 14522: Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)')
     expect(receipts.map((r) => r.receipt_ref)).toContain('AR-2026-0041')
   })
 

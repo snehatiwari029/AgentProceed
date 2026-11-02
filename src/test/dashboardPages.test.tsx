@@ -92,7 +92,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(within(b).getByText('Won')).toBeInTheDocument()
 
     const gap = screen.getByText('14522').closest('tr')!
-    expect(within(gap).getByText('Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)')).toBeInTheDocument()
+    expect(within(gap).getByText('Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)')).toBeInTheDocument()
     expect(within(gap).getByText('Hold for Suspicion')).toBeInTheDocument()
     expect(within(gap).queryByRole('button')).not.toBeInTheDocument()
     expect(within(b).getByText('Pass')).toBeInTheDocument()

@@ -258,7 +258,7 @@ export async function buildSeed(): Promise<{ sql: string; records: SeedRecord[] 
   plain('sessions', {
     id: uid('14522:session'), merchant_id: MERCHANT_ID, detection_source: 'none', agent_id: null, agent_verified: false,
     agent_verified_simulated: true,
-    gap_note: 'Order 14522: Unverified agent, no AgentReceipt session opened, no receipt (gap recorded)',
+    gap_note: 'Order 14522: Unverified agent, no Agent Receipt session opened, no receipt (gap recorded)',
     opened_at: at('19:00'),
   })
   void t
