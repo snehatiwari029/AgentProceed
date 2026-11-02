@@ -97,7 +97,7 @@ describe('Dispute Agent: evidence pack for 13422 (seeded, Visa 10.4)', () => {
     for (const label of ['Carrier', 'Tracking reference', 'Proof of delivery']) {
       expect(delivery.find((i) => i.label === label)).toMatchObject({ status: 'missing', value: null, obtain_from: 'Obtain from fulfilment system' })
     }
-    expect(p.merchant_review_statement).toMatch(/No merchant review record\. The order was Pass at Order check, so no review was flagged\./)
+    expect(p.merchant_review_statement).toMatch(/No merchant review record\. The order was Pass at Agent Receipt check, so no review was flagged\./)
   })
 
   it('lists every missing item with where to obtain it, and flags merchant input; nothing is filled in', async () => {
@@ -126,7 +126,7 @@ describe('Dispute Agent: evidence pack for 13422 (seeded, Visa 10.4)', () => {
     expect(p.notes).toContain(DEADLINE_LINE)
     expect(textOf(p)).not.toMatch(/CE3\.0 (is )?(not )?applicable|45 days|deadline: 20\d\d/i)
     expect(p.notes.join(' ')).toMatch(/Visa Rules prevail/)
-    expect(p.disclaimer).toMatch(/Does not replace Visa \/ Mastercard Rules\. Does not guarantee outcome\. Confirm eligibility with your acquirer before submitting\. AgentReceipt does not submit this pack on your behalf, and does not decide liability\./)
+    expect(p.disclaimer).toMatch(/Does not replace Visa \/ Mastercard Rules\. Does not guarantee outcome\. Confirm eligibility with your acquirer before submitting\. Agent Proceed does not submit this pack on your behalf, and does not decide liability\./)
   })
 
   it('tamper gate: one line with the receipt hash when the chain verifies; the failing link and an untrusted pack when it does not', async () => {
@@ -243,7 +243,7 @@ describe('Dispute Agent: record a dispute (manual form, through the edge functio
     const w = await world()
     const r = await w.call('record_dispute', { order_ref: 'TEST-99999', processor: 'visa', claim: 'x', claim_type: 'other', reason_code: '10.4', dispute_date: '2026-11-01' })
     expect(r).toEqual({ type: 'not_agent_order', message: NOT_AGENT_ORDER, gap: false })
-    expect(NOT_AGENT_ORDER).toBe('Not an AgentReceipt order — no evidence package built.')
+    expect(NOT_AGENT_ORDER).toBe('Not an Agent Receipt order — no evidence package built.')
     expect(w.writes).toEqual([])
     // 14522 is a recorded gap (no receipt): still no pack
     expect(await w.call('record_dispute', { order_ref: '14522', processor: 'visa', claim: 'x', claim_type: 'other', reason_code: '10.4', dispute_date: '2026-11-01' })).toMatchObject({ type: 'not_agent_order', gap: true })
@@ -287,7 +287,7 @@ describe('Dispute Agent: Layer 2 merchant review record', () => {
     const w = await world()
     await w.call('record_dispute', { order_ref: '12322', processor: 'visa', claim: 'Misled about returns', claim_type: 'misrepresentation', reason_code: '13.5', dispute_date: '2026-11-03' })
     const p = await packFor(w, '12322', 'visa', { gate: { status: 'passed', receipt_hash: 'sha256:x' } })
-    expect(p.merchant_review_statement).toMatch(new RegExp(`^${NO_REVIEW} This order was Review Required at Order check and no merchant action was recorded at review time\\.`))
+    expect(p.merchant_review_statement).toMatch(new RegExp(`^${NO_REVIEW} This order was Review Required at Agent Receipt check and no merchant action was recorded at review time\\.`))
     expect(w.tables.merchant_reviews).toEqual([])
     // held, no shipment, no release: the merchant must say whether it shipped
     expect(p.needs.find((n) => n.item === 'Confirmation that this order shipped')).toMatchObject({ merchant_input: true })

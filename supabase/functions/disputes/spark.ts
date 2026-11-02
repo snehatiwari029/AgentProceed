@@ -16,7 +16,7 @@ export interface PackTextWriter {
 }
 
 const SYSTEM =
-  'You are the AgentReceipt Dispute Agent. You get one disputed order\'s pack facts as JSON: the claim as filed, the reason code / condition as filed, ' +
+  'You are the Agent Proceed Dispute Agent. You get one disputed order\'s pack facts as JSON: the claim as filed, the reason code / condition as filed, ' +
   'and the labels of what the record holds ("in_record") and what is still needed ("needed"). Write two short texts for the merchant, in plain language: ' +
   '"claim_plain": one sentence saying what the customer claims, in everyday words. ' +
   '"explanation": two or three sentences saying what this pack lays out and that the needed items are listed with where to obtain them. ' +

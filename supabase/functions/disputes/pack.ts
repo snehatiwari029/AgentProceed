@@ -7,7 +7,7 @@
 // item the processor's evidence needs that the record does not hold, with where to obtain it.
 //
 // What it never does: decide fight / concede, liability, a reason code or an outcome; score a dispute; fill a missing
-// item; compute a deadline. The reason code / condition is shown exactly as filed. The Order check verdict is shown as
+// item; compute a deadline. The reason code / condition is shown exactly as filed. The Agent Receipt verdict is shown as
 // part of Layer 1 evidence, nothing more.
 //
 // Muse Spark writes two texts only (a plain-language reading of the claim, and a short explanation of the pack). They
@@ -39,7 +39,7 @@ const CLAIM_PLAIN: Record<ClaimType, string> = {
   not_authorised: 'Customer says they did not authorise this purchase.',
   not_as_described: 'Customer says the item is not what was described.',
   misrepresentation: 'Customer says they were misled about the terms of the purchase.',
-  other: 'See the claim as filed; AgentReceipt has no plain-language reading for this claim type.',
+  other: 'See the claim as filed; Agent Proceed has no plain-language reading for this claim type.',
 }
 // A dispute recorded before claim types existed has no claim type. Its claim text is still read, narrowly: only the
 // agent-overstep wording gets the plain reading. Anything else says the claim type was not filed.
@@ -117,7 +117,7 @@ export type PackInput = {
 
 export type ItemStatus = 'present' | 'missing' | 'unspecified'
 // origin 'sample': a dispute-notice value shown in the sample example (never stored, never filed). Absent = the value
-// comes from the AgentReceipt record or the dispute as recorded.
+// comes from the Agent Receipt record or the dispute as recorded.
 export type Item = { label: string; value: string | null; status: ItemStatus; obtain_from?: string; note?: string; origin?: 'sample' }
 export type VerdictRow = { field: string; grant: string | null; merchant_terms: string | null; actual: string | null; result: string; cause: string | null; next_action_who: string | null; key?: string }
 // tone 'sample': the section holds sample notice values (shown once, as an orange section accent). Otherwise 'record'.
@@ -160,12 +160,12 @@ export type Pack = {
 }
 
 export const DISCLAIMER =
-  'Generated from AgentReceipt verified record only. Does not replace Visa / Mastercard Rules. Does not guarantee outcome. Confirm eligibility with your acquirer before submitting. AgentReceipt does not submit this pack on your behalf, and does not decide liability.'
+  'Generated from Agent Receipt verified record only. Does not replace Visa / Mastercard Rules. Does not guarantee outcome. Confirm eligibility with your acquirer before submitting. Agent Proceed does not submit this pack on your behalf, and does not decide liability.'
 export const FALLBACK_LABEL = 'rules-fallback — deterministic check only, Spark formatting unavailable'
 export const SPARK_LABEL = 'Plain-language text by Muse Spark, checked against this record: no number, date, hash or code that is not in the record.'
-export const VERDICT_FOOTER = 'AgentReceipt shows mismatch facts only; it does not decide liability and no network rule moves liability on this screen.'
+export const VERDICT_FOOTER = 'Agent Receipt shows mismatch facts only; it does not decide liability and no network rule moves liability on this screen.'
 export const DEADLINE_LINE = 'Deadline: confirm with acquirer — settlement date not in record.'
-export const CE3_LINE = 'CE3.0 eligibility cannot be determined from AgentReceipt record — prior transactions / device data not in record, obtain from acquirer.'
+export const CE3_LINE = 'CE3.0 eligibility cannot be determined from Agent Receipt record — prior transactions / device data not in record, obtain from acquirer.'
 export const MC_REGISTRATION_LINE = 'Registration status not in record — confirm with acquirer.'
 export const CODE_FLAG = 'Code does not match claim — confirm with acquirer.'
 export const NO_REVIEW = 'No merchant review record.'
@@ -209,25 +209,25 @@ const DECISION_LABEL: Record<string, string> = { pass: 'Pass', review_required: 
 
 // ---------- Layer 1 ----------
 function grantItems(g: Row | null, merchantName: string): Item[] {
-  if (!g) return [present('Grant record', null, { obtain_from: 'Not in AgentReceipt record' })]
+  if (!g) return [present('Grant record', null, { obtain_from: 'Not in Agent Receipt record' })]
   const lo = n(g.size_min_cm)
   const hi = n(g.size_max_cm)
   const ret = g.return_policy_required
   const budget = money(n(g.amount_max_cents) ?? n(g.budget_limit_cents))
   return [
-    present('Budget (maximum total)', budget ? `${budget} max` : null, { obtain_from: 'Not in AgentReceipt record' }),
+    present('Budget (maximum total)', budget ? `${budget} max` : null, { obtain_from: 'Not in Agent Receipt record' }),
     s(g.product_scope) ? present('Product scope', s(g.product_scope)) : unspecified('Product scope', 'Not specified by the customer — no product scope check'),
     lo !== null || hi !== null ? present('Size range', `${lo ?? '?'}–${hi ?? '?'} cm`) : unspecified('Size range', 'Not specified by the customer — no size check'),
     s(g.colour_preference) ? present('Colour', s(g.colour_preference)) : unspecified('Colour', 'Not specified by the customer — no colour check'),
     s(g.delivery_by) ? present('Delivery by', date(g.delivery_by)) : unspecified('Delivery by', 'Not specified by the customer — no delivery check'),
     ret === true ? present('Returnable required', 'Yes, returnable required') : ret === false ? present('Returnable required', 'Not required') : unspecified('Returnable required', 'Not specified by the customer — no returns check'),
-    present('Payment method ref', s(g.payment_method_ref), { obtain_from: 'Not in AgentReceipt record' }),
+    present('Payment method ref', s(g.payment_method_ref), { obtain_from: 'Not in Agent Receipt record' }),
     present('Merchant', merchantName),
-    present('Grant expiry', when(g.expires_at), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Grant confirmed at', when(g.confirmed_at), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Customer (as recorded on the grant)', s(g.shopper_ref), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Agent', s(g.agent_id) ? `${s(g.agent_id)}${g.agent_verified === true ? ' (verified-agent signal, simulated)' : ' (unverified)'}` : null, { obtain_from: 'Not in AgentReceipt record' }),
-    present('Grant seal (entry hash)', s(g.entry_hash), { obtain_from: 'Not in AgentReceipt record' }),
+    present('Grant expiry', when(g.expires_at), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Grant confirmed at', when(g.confirmed_at), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Customer (as recorded on the grant)', s(g.shopper_ref), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Agent', s(g.agent_id) ? `${s(g.agent_id)}${g.agent_verified === true ? ' (verified-agent signal, simulated)' : ' (unverified)'}` : null, { obtain_from: 'Not in Agent Receipt record' }),
+    present('Grant seal (entry hash)', s(g.entry_hash), { obtain_from: 'Not in Agent Receipt record' }),
   ]
 }
 
@@ -243,16 +243,16 @@ function actionItems(receipt: Row, action: Row | null, proposal: Row | null): It
   const believed = s((action?.agent_believed_terms as Row | null | undefined)?.returns) ?? s(sum.agent_summary_returns) ?? s((det.agent_summary as Row | undefined)?.returns)
   const pmDetail = s(pick('payment_method_detail'))
   const items: Item[] = [
-    present('Product', product, { obtain_from: 'Not in AgentReceipt record' }),
-    present('Size', n(pick('size_cm')) !== null ? `${n(pick('size_cm'))} cm` : null, { obtain_from: 'Not in AgentReceipt record' }),
+    present('Product', product, { obtain_from: 'Not in Agent Receipt record' }),
+    present('Size', n(pick('size_cm')) !== null ? `${n(pick('size_cm'))} cm` : null, { obtain_from: 'Not in Agent Receipt record' }),
     s(pick('colour')) ? present('Colour', s(pick('colour'))) : unspecified('Colour', 'Not recorded on the action'),
-    present('Item price', money(n(pick('item_price_cents'))), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Shipping price', ship === null ? null : `${money(ship)}${method ? ` (${method})` : ''}`, { obtain_from: 'Not in AgentReceipt record' }),
-    present('Total price', money(n(pick('total_cents'))), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Delivery date', date(pick('delivery_date')), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Payment method', s(pick('payment_method')), { obtain_from: 'Not in AgentReceipt record' }),
+    present('Item price', money(n(pick('item_price_cents'))), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Shipping price', ship === null ? null : `${money(ship)}${method ? ` (${method})` : ''}`, { obtain_from: 'Not in Agent Receipt record' }),
+    present('Total price', money(n(pick('total_cents'))), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Delivery date', date(pick('delivery_date')), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Payment method', s(pick('payment_method')), { obtain_from: 'Not in Agent Receipt record' }),
     present('Payment method detail', pmDetail, { obtain_from: ACQUIRER }),
-    present('Agent summary / agent believed terms', believed, { obtain_from: 'Not in AgentReceipt record' }),
+    present('Agent summary / agent believed terms', believed, { obtain_from: 'Not in Agent Receipt record' }),
   ]
   if (proposal) {
     const shownTotal = n(proposal.shown_total_cents)
@@ -260,7 +260,7 @@ function actionItems(receipt: Row, action: Row | null, proposal: Row | null): It
       { label: 'Total shown to the customer before confirmation', value: shownTotal === null ? 'Not shown (no total on the proposal)' : money(shownTotal), status: 'present' },
       present('Returns shown to the customer', s(proposal.shown_returns_summary)),
       present('Delivery shown to the customer', s(proposal.shown_delivery)),
-      present('Customer confirmed the proposal at', when(proposal.confirmed_at), { obtain_from: 'Not in AgentReceipt record' }),
+      present('Customer confirmed the proposal at', when(proposal.confirmed_at), { obtain_from: 'Not in Agent Receipt record' }),
     )
   }
   return items
@@ -296,10 +296,10 @@ function tamperLine(gate: Gate): string {
 
 function receiptItems(receipt: Row, gate: Gate): Item[] {
   return [
-    present('Receipt ID', s(receipt.receipt_ref), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Receipt hash', s(receipt.entry_hash), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Receipt sealed at', when(receipt.sealed_at), { obtain_from: 'Not in AgentReceipt record' }),
-    present('Order check verdict (evidence only)', DECISION_LABEL[String(receipt.decision)] ? `${DECISION_LABEL[String(receipt.decision)]}, ${n(receipt.problems_found) ?? 0} problems` : null, { obtain_from: 'Not in AgentReceipt record' }),
+    present('Receipt ID', s(receipt.receipt_ref), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Receipt hash', s(receipt.entry_hash), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Receipt sealed at', when(receipt.sealed_at), { obtain_from: 'Not in Agent Receipt record' }),
+    present('Agent Receipt verdict (evidence only)', DECISION_LABEL[String(receipt.decision)] ? `${DECISION_LABEL[String(receipt.decision)]}, ${n(receipt.problems_found) ?? 0} problems` : null, { obtain_from: 'Not in Agent Receipt record' }),
     { label: TAMPER_LABEL, value: tamperLine(gate), status: gate.status === 'passed' ? 'present' : 'missing', ...(gate.status === 'passed' ? {} : { obtain_from: 'Investigate the receipt chain' }) },
   ]
 }
@@ -329,8 +329,8 @@ function reviewItems(receipt: Row, reviews: Row[]): { items: Item[]; statement: 
     return {
       items: [],
       statement: flagged
-        ? `${NO_REVIEW} This order was ${DECISION_LABEL[decision]} at Order check and no merchant action was recorded at review time.`
-        : `${NO_REVIEW} The order was ${DECISION_LABEL[decision] ?? 'not flagged'} at Order check, so no review was flagged.`,
+        ? `${NO_REVIEW} This order was ${DECISION_LABEL[decision]} at Agent Receipt check and no merchant action was recorded at review time.`
+        : `${NO_REVIEW} The order was ${DECISION_LABEL[decision] ?? 'not flagged'} at Agent Receipt check, so no review was flagged.`,
       gaps: [],
     }
   }
@@ -359,10 +359,10 @@ function reviewItems(receipt: Row, reviews: Row[]): { items: Item[]; statement: 
   const confirmations = reviews.filter((r) => CONFIRMING.has(String(r.action_taken)))
   if (confirmations.length > 0) {
     if (problemFields.includes('budget') && !confirmations.some((r) => s(r.confirmed_total))) {
-      gaps.push({ item: 'Confirmed total in the merchant review record', why: 'Budget was a mismatch at Order check; the review record confirms no total.', obtain_from: 'Not in merchant review record — a dispute-time note is labelled separately', merchant_input: true })
+      gaps.push({ item: 'Confirmed total in the merchant review record', why: 'Budget was a mismatch at Agent Receipt check; the review record confirms no total.', obtain_from: 'Not in merchant review record — a dispute-time note is labelled separately', merchant_input: true })
     }
     if (problemFields.includes('returns') && !confirmations.some((r) => s(r.confirmed_terms))) {
-      gaps.push({ item: 'Confirmed terms in the merchant review record', why: 'Returns was a mismatch at Order check; the review record confirms no terms.', obtain_from: 'Not in merchant review record — a dispute-time note is labelled separately', merchant_input: true })
+      gaps.push({ item: 'Confirmed terms in the merchant review record', why: 'Returns was a mismatch at Agent Receipt check; the review record confirms no terms.', obtain_from: 'Not in merchant review record — a dispute-time note is labelled separately', merchant_input: true })
     }
   }
   return { items, statement: `${reviews.length} merchant review ${reviews.length === 1 ? 'record' : 'records'}, recorded at review time, in order.`, gaps }
@@ -402,7 +402,7 @@ function claimVsRecord(claimType: ClaimType | null, receipt: Row, reviews: Row[]
     const r = rows.find((x) => (x.key ?? x.field.toLowerCase()) === k)
     const claim = CLAIM_ELEMENT[k] ?? r?.field ?? k
     if (!r) {
-      out.push({ element: k, claim, record: 'Not in AgentReceipt record', result: 'not_in_record' })
+      out.push({ element: k, claim, record: 'Not in Agent Receipt record', result: 'not_in_record' })
       continue
     }
     if (r.result === 'unspecified') {
@@ -424,13 +424,13 @@ function claimVsRecord(claimType: ClaimType | null, receipt: Row, reviews: Row[]
     const result: ElementResult = r.result === 'match' ? 'match' : r.result === 'mismatch' ? 'mismatch' : r.result === 'unspecified' ? 'unspecified' : 'not_in_record'
     out.push({ element: r.field, claim, record: parts.join(' · '), result })
   }
-  if (claimType === 'not_authorised') out.push({ element: 'Cardholder identity verification', claim: 'Cardholder did not take part', record: 'Not in AgentReceipt record', result: 'not_in_record' })
-  if (claimType === 'not_as_described') out.push({ element: 'Item condition on delivery', claim: 'Item arrived different or defective', record: 'Not in AgentReceipt record', result: 'not_in_record' })
+  if (claimType === 'not_authorised') out.push({ element: 'Cardholder identity verification', claim: 'Cardholder did not take part', record: 'Not in Agent Receipt record', result: 'not_in_record' })
+  if (claimType === 'not_as_described') out.push({ element: 'Item condition on delivery', claim: 'Item arrived different or defective', record: 'Not in Agent Receipt record', result: 'not_in_record' })
   if (claimType === 'misrepresentation') {
     const ack = reviews.find((v) => CONFIRMING.has(String(v.action_taken)) && s(v.confirmed_terms))
     out.push(ack
       ? { element: 'Terms acknowledged by the customer', claim: 'Customer was not told the real terms', record: `Merchant review record: confirmed terms "${s(ack.confirmed_terms)}" (${ACTION_TAKEN_LABEL[String(ack.action_taken)]})`, result: 'in_record' }
-      : { element: 'Terms acknowledged by the customer', claim: 'Customer was not told the real terms', record: 'Not in AgentReceipt record', result: 'not_in_record' })
+      : { element: 'Terms acknowledged by the customer', claim: 'Customer was not told the real terms', record: 'Not in Agent Receipt record', result: 'not_in_record' })
   }
   return out
 }
@@ -460,15 +460,15 @@ function claimItems(input: PackInput): Item[] {
     notice(d, present('Processor as filed', filed ? PROCESSOR_LABEL[filed] : null)),
     notice(d, present('Acquirer / channel', s(d.channel), { obtain_from: ACQUIRER })),
     notice(d, present('Reason code / condition as filed', s(d.reason_code), { obtain_from: ACQUIRER })),
-    notice(d, present('Dispute date', date(d.dispute_date), { obtain_from: ACQUIRER, ...(date(d.opened_at) ? { note: `Not filed. The dispute was recorded in AgentReceipt on ${date(d.opened_at)}.` } : {}) })),
+    notice(d, present('Dispute date', date(d.dispute_date), { obtain_from: ACQUIRER, ...(date(d.opened_at) ? { note: `Not filed. The dispute was recorded in Agent Proceed on ${date(d.opened_at)}.` } : {}) })),
     notice(d, present('Dispute amount', money(n(d.dispute_amount_cents)), { obtain_from: ACQUIRER })),
-    notice(d, present('Processor reference', s(d.processor_reference), { obtain_from: ACQUIRER, note: 'Not in AgentReceipt record — obtain from acquirer.' })),
+    notice(d, present('Processor reference', s(d.processor_reference), { obtain_from: ACQUIRER, note: 'Not in Agent Receipt record — obtain from acquirer.' })),
   ]
 }
 // Cardholder details come from the grant (real record), not from the notice.
 const cardholderItem = (g: Row | null): Item => present('Cardholder details (as recorded on the grant)', s(g?.shopper_ref), { obtain_from: ACQUIRER })
 const credentialItem = (d: Row, label: string): Item =>
-  notice(d, present(label, s(d.card_last4_or_token), { obtain_from: ACQUIRER, note: 'AgentReceipt records the payment method, not the credential.' }))
+  notice(d, present(label, s(d.card_last4_or_token), { obtain_from: ACQUIRER, note: 'Agent Receipt records the payment method, not the credential.' }))
 const withTone = (sections: Section[]): Section[] =>
   sections.map((x) => ({ ...x, tone: x.items.some((i) => i.origin === 'sample') ? 'sample' : 'record' }))
 
@@ -487,9 +487,9 @@ function visa(c: Ctx): { sections: Section[]; notes: string[] } {
     { key: 'action', title: 'Transaction — what the agent did', items: c.action },
     { key: 'terms', title: is13 ? 'Description and terms presented at purchase (formal terms snapshot)' : 'Formal terms at order time', items: [
       ...c.terms,
-      ...(is13 ? [present('Product page / checkout as presented (screenshots)', null, { obtain_from: MERCHANT, note: 'AgentReceipt stores formal terms and the agent summary, not the page as displayed.' })] : []),
+      ...(is13 ? [present('Product page / checkout as presented (screenshots)', null, { obtain_from: MERCHANT, note: 'Agent Proceed stores formal terms and the agent summary, not the page as displayed.' })] : []),
     ] },
-    { key: 'verdict', title: 'Order check — line-by-line verdict', items: [], verdict: c.verdict, footer: VERDICT_FOOTER },
+    { key: 'verdict', title: 'Agent Receipt — line-by-line verdict', items: [], verdict: c.verdict, footer: VERDICT_FOOTER },
     { key: 'receipt', title: 'Record integrity — hash-chained receipt', items: c.receipt },
     { key: 'merchant_review', title: 'Merchant review record', items: c.merchantReview },
     { key: 'delivery', title: is104 ? 'Proof of delivery / access' : 'Shipment and delivery', items: shipmentItems(c.input.shipment, 'Proof of delivery') },
@@ -511,14 +511,14 @@ function mastercard(c: Ctx): { sections: Section[]; notes: string[] } {
       ...(s(c.input.dispute.card_last4_or_token) ? [credentialItem(c.input.dispute, 'Card last 4 / token')] : []),
       present('Authorisation code / initial authorisation date', null, { obtain_from: ACQUIRER }),
       present('Settlement Date (DE 15) / Central Site Business Date', null, { obtain_from: ACQUIRER, note: 'Needed for the second presentment time frame.' }),
-      present('Message text (DE 72) and message reason code', null, { obtain_from: ACQUIRER, note: 'Entered by the acquirer; AgentReceipt does not set DE values.' }),
+      present('Message text (DE 72) and message reason code', null, { obtain_from: ACQUIRER, note: 'Entered by the acquirer; Agent Proceed does not set DE values.' }),
     ] },
     { key: 'action', title: 'Transaction details — what the agent did', items: c.action },
     { key: 'grant', title: 'Cardholder participation — the grant the customer gave the agent', items: c.grant },
     { key: 'terms', title: 'Merchant terms at order time', items: c.terms },
     { key: 'delivery', title: 'Signed proof of delivery and shipment', items: shipmentItems(c.input.shipment, 'Signed proof of delivery') },
     { key: 'merchant_review', title: 'Correspondence documenting cardholder participation (merchant review record)', items: c.merchantReview },
-    { key: 'verdict', title: 'Order check — line-by-line verdict', items: [], verdict: c.verdict, footer: VERDICT_FOOTER },
+    { key: 'verdict', title: 'Agent Receipt — line-by-line verdict', items: [], verdict: c.verdict, footer: VERDICT_FOOTER },
     { key: 'receipt', title: 'Record integrity — hash-chained receipt', items: c.receipt },
     { key: 'eligibility', title: 'Second presentment conditions', items: [
       present('Cardholder registration status (registered or guest checkout)', null, { obtain_from: ACQUIRER, note: MC_REGISTRATION_LINE }),
@@ -551,7 +551,7 @@ const WHY: Record<Processor, Record<string, string>> = {
 }
 const COMMON_WHY: Record<string, string> = {
   'Processor reference': 'Ties this response to the dispute case at your acquirer.',
-  'Shipment record': 'The pack is for a shipped order; AgentReceipt has no shipment record for it.',
+  'Shipment record': 'The pack is for a shipped order; Agent Proceed has no shipment record for it.',
   'Delivered on': 'Shows when the goods reached the customer.',
   Carrier: 'Identifies who delivered the goods.',
   'Tracking reference': 'Lets the acquirer check delivery.',
@@ -571,7 +571,7 @@ function collectNeeds(processor: Processor, sections: Section[]): Need[] {
       const from = it.obtain_from ?? ACQUIRER
       needs.push({
         item: it.label,
-        why: WHY[processor][it.label] ?? COMMON_WHY[it.label] ?? (it.note ?? 'Required for this pack and not in the AgentReceipt record.'),
+        why: WHY[processor][it.label] ?? COMMON_WHY[it.label] ?? (it.note ?? 'Required for this pack and not in the Agent Receipt record.'),
         obtain_from: from,
         merchant_input: from !== ACQUIRER,
       })
@@ -591,7 +591,7 @@ export function templateTexts(p: { processor_label: string; filed_label: string 
   return {
     claim_plain: claimPlain(p.claim.claim_type, p.claim.as_filed),
     explanation:
-      `This pack lays out the AgentReceipt record for order ${p.order_ref ?? p.receipt_ref} (${p.receipt_ref}), shown in ${p.processor_label} field order. ${filed} ` +
+      `This pack lays out the Agent Receipt record for order ${p.order_ref ?? p.receipt_ref} (${p.receipt_ref}), shown in ${p.processor_label} field order. ${filed} ` +
       (m ? `${m} ${m === 1 ? 'item is' : 'items are'} not in the record; each one names where to obtain it. ` : 'Every item this format lists is in the record. ') +
       'You decide with your acquirer whether to fight or concede.',
   }
@@ -664,7 +664,7 @@ export async function buildPack(input: PackInput): Promise<Pack> {
       ? cond.plain
       : asFiled && filed && filed !== processor
         ? `Filed under ${PROCESSOR_LABEL[filed]} as "${asFiled}". This ${PROCESSOR_LABEL[processor]} format has no translation for it — confirm with acquirer.`
-        : asFiled ? 'No plain-language translation in AgentReceipt for this code — confirm with acquirer.' : 'Reason code / condition not filed — obtain from acquirer.',
+        : asFiled ? 'No plain-language translation in Agent Proceed for this code — confirm with acquirer.' : 'Reason code / condition not filed — obtain from acquirer.',
     code_flag: codeFlag,
   }
   const l2 = reviewItems(receipt, input.reviews)
@@ -683,7 +683,7 @@ export async function buildPack(input: PackInput): Promise<Pack> {
   // A held order with no shipment record and no release: the merchant must say whether it shipped. Nothing is assumed.
   const released = input.reviews.some((r) => r.release_decision === 'released')
   if (!input.shipment && receipt.fulfillment === 'held' && !released) {
-    needs.push({ item: 'Confirmation that this order shipped', why: 'AgentReceipt recorded this order as held for review, with no release record and no shipment record.', obtain_from: MERCHANT, merchant_input: true })
+    needs.push({ item: 'Confirmation that this order shipped', why: 'Agent Receipt recorded this order as held for review, with no release record and no shipment record.', obtain_from: MERCHANT, merchant_input: true })
   }
   const base = {
     processor_label: PROCESSOR_LABEL[processor], filed_label: filed ? PROCESSOR_LABEL[filed] : null, order_ref: s(receipt.order_ref), receipt_ref: s(receipt.receipt_ref) ?? '', claim, sections: t.sections, needs,

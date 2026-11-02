@@ -170,7 +170,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(within(row).getByText(/did not authorise or take part in this card-absent/)).toBeInTheDocument()
     expect(within(row).getByText('7 documents missing — see pack')).toBeInTheDocument()
     expect(within(row).getByText('Merchant input required')).toBeInTheDocument()
-    expect(screen.getByTestId('disputes-disclaimer')).toHaveTextContent(/AgentReceipt does not submit this pack on your behalf, and does not decide liability/)
+    expect(screen.getByTestId('disputes-disclaimer')).toHaveTextContent(/Agent Proceed does not submit this pack on your behalf, and does not decide liability/)
     expect(screen.getByText(/Orders on\s+hold, Review Required, or Hold for Suspicion with no shipment do not appear here/)).toBeInTheDocument()
   })
 
@@ -202,7 +202,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect([...packEl.querySelectorAll('[data-pack-section]')].map((x) => x.getAttribute('data-pack-section'))).toEqual(['dispute', 'grant', 'action', 'terms', 'verdict', 'receipt', 'merchant_review', 'delivery'])
     expect(within(packEl).getByTestId('text-source')).toHaveTextContent('rules-fallback — deterministic check only, Spark formatting unavailable')
     expect(within(packEl).getByTestId('pack-record')).toHaveTextContent('Matches the pack generation record of 2026-10-30.')
-    expect(within(packEl).getByTestId('pack-notes')).toHaveTextContent('CE3.0 eligibility cannot be determined from AgentReceipt record — prior transactions / device data not in record, obtain from acquirer.')
+    expect(within(packEl).getByTestId('pack-notes')).toHaveTextContent('CE3.0 eligibility cannot be determined from Agent Receipt record — prior transactions / device data not in record, obtain from acquirer.')
     expect(within(packEl).getByTestId('pack-notes')).toHaveTextContent('Deadline: confirm with acquirer — settlement date not in record.')
     expect(within(detail).getByTestId('merchant-input-flag')).toHaveTextContent('Merchant input required: Carrier; Tracking reference; Proof of delivery.')
     expect(within(detail).getByTestId('decision-history')).toHaveTextContent(/Fought \(submitted to acquirer\)2026-11-01.*\(merchant-reported\).*Won2026-11-02/)
@@ -291,14 +291,14 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     }
   })
 
-  it('Record a dispute: a non-agent order shows "Not an AgentReceipt order — no evidence package built." and nothing is built', async () => {
+  it('Record a dispute: a non-agent order shows "Not an Agent Receipt order — no evidence package built." and nothing is built', async () => {
     const user = userEvent.setup()
     vi.stubEnv('VITE_SUPABASE_URL', 'https://project.test')
     vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test')
     const calls: Record<string, unknown>[] = []
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
       calls.push(JSON.parse(String(init.body)))
-      return new Response(JSON.stringify({ type: 'not_agent_order', message: 'Not an AgentReceipt order — no evidence package built.', gap: false }))
+      return new Response(JSON.stringify({ type: 'not_agent_order', message: 'Not an Agent Receipt order — no evidence package built.', gap: false }))
     }))
     try {
       open('/dashboard/disputes')
@@ -309,7 +309,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
       await user.type(screen.getByLabelText('Reason code / condition as filed'), '10.4')
       await user.type(screen.getByLabelText('Dispute date'), '2026-11-03')
       await user.click(screen.getByRole('button', { name: 'Record dispute' }))
-      expect(await screen.findByText('Not an AgentReceipt order — no evidence package built.')).toBeInTheDocument()
+      expect(await screen.findByText('Not an Agent Receipt order — no evidence package built.')).toBeInTheDocument()
       expect(calls).toEqual([expect.objectContaining({ action: 'record_dispute', order_ref: 'TEST-NOT-AN-ORDER', processor: 'visa', reason_code: '10.4', dispute_amount_cents: null })])
       expect(screen.queryAllByTestId('dispute-detail')).toHaveLength(0)
     } finally {
@@ -356,7 +356,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
       const li = [...within(detail).getByTestId('timeline').querySelectorAll('li')].find((x) => x.querySelector('span')!.textContent === name)!
       expect(li.querySelectorAll('span')[1]).toHaveTextContent(/^no record$/)
     }
-    expect(within(detail).getByTestId('evidence-pack')).toHaveTextContent('Not filed. The dispute was recorded in AgentReceipt on 2026-10-26.')
+    expect(within(detail).getByTestId('evidence-pack')).toHaveTextContent('Not filed. The dispute was recorded in Agent Proceed on 2026-10-26.')
     expect(detail.textContent).not.toMatch(/Dispute filed 2026-10-26/)
     // 2. the viewed format is never presented as the filed processor
     expect(within(detail).getByTestId('format-note')).toHaveTextContent('Processor not filed. Pack format: Visa — view only.')
@@ -366,7 +366,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
     expect(within(detail).getByTestId('claim-vs-record')).toHaveTextContent('Customer says the agent bought outside what they authorised.')
     expect(detail.textContent).not.toMatch(/no plain-language reading for this claim type/)
     // 5. inside the pack, the Layer 2 statement appears once (the timeline has its own step)
-    expect(within(detail).getByTestId('evidence-pack').textContent!.match(/No merchant review record\. The order was Pass at Order check, so no review was flagged\./g)).toHaveLength(1)
+    expect(within(detail).getByTestId('evidence-pack').textContent!.match(/No merchant review record\. The order was Pass at Agent Receipt check, so no review was flagged\./g)).toHaveLength(1)
     // the old recommendation entry is never shown
     expect(detail.textContent).not.toMatch(/recommend/i)
   })
@@ -432,7 +432,7 @@ describe('Dashboard pages with the seeded rows (read live from the tables)', () 
         expect(value(l)).toHaveClass('text-dash-sample')
       }
       // real fields: blue, unchanged
-      for (const [l, v] of [['Cardholder details (as recorded on the grant)', 'Ivan Dijkstra'], ['Dispute claim as filed', 'Agent overstep — agent exceeded budget / bought outside grant'], ['Transaction amount', '$489.83'], ['Budget (maximum total)', '$500.00 max'], ['Total price', '$489.83'], ['Receipt ID', 'AR-2026-0043'], ['Order check verdict (evidence only)', 'Pass, 0 problems']]) {
+      for (const [l, v] of [['Cardholder details (as recorded on the grant)', 'Ivan Dijkstra'], ['Dispute claim as filed', 'Agent overstep — agent exceeded budget / bought outside grant'], ['Transaction amount', '$489.83'], ['Budget (maximum total)', '$500.00 max'], ['Total price', '$489.83'], ['Receipt ID', 'AR-2026-0043'], ['Agent Receipt verdict (evidence only)', 'Pass, 0 problems']]) {
         expect(value(l)).toHaveTextContent(v)
         expect(value(l)).toHaveAttribute('data-value', 'record')
         expect(value(l)).toHaveClass('text-dash-real')

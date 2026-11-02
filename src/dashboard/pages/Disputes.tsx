@@ -488,7 +488,7 @@ function DisputeDetail({ row, merchant, reload, onChanged, autoGenerate, clearAu
             )}
             <Block title="Related (navigation only)">
               <p className="text-sm text-dash-body">
-                <Link className="font-semibold text-dash-teal" to="/dashboard/orders">Agent orders — this order&apos;s Order check</Link>
+                <Link className="font-semibold text-dash-teal" to="/dashboard/orders">Agent orders — this order&apos;s Agent Receipt check</Link>
                 {' · '}
                 <Link className="font-semibold text-dash-teal" to="/dashboard/optimization">Listing Optimizer — listing guidance</Link>
               </p>
@@ -554,7 +554,7 @@ function Timeline({ row, data }: { row: ListRow; data: Loaded }) {
   steps.push({ at: receipt.sealed_at ?? '', rank: 2, title: 'Verdict', detail: `${receipt.decision ? { pass: 'Pass', review_required: 'Review Required', hold_suspicion: 'Hold for Suspicion' }[receipt.decision] : 'No decision'} · ${receipt.problems_found} problems`, source: `Receipt ${receipt.receipt_ref}` })
   if (data.reviews.length === 0) {
     const flagged = receipt.decision === 'review_required' || receipt.decision === 'hold_suspicion'
-    steps.push({ at: receipt.sealed_at ?? '', rank: 3, title: 'Merchant review', dateLabel: 'no record', detail: flagged ? 'No merchant review record.' : 'No merchant review record. The order was Pass at Order check, so no review was flagged.', source: 'Merchant review records' })
+    steps.push({ at: receipt.sealed_at ?? '', rank: 3, title: 'Merchant review', dateLabel: 'no record', detail: flagged ? 'No merchant review record.' : 'No merchant review record. The order was Pass at Agent Receipt check, so no review was flagged.', source: 'Merchant review records' })
   }
   for (const r of data.reviews) steps.push({ at: r.recorded_at, rank: 3, title: 'Merchant review (recorded at review time)', detail: `${r.action_taken.replace(/_/g, ' ')} · ${r.method} · ${r.release_decision === 'released' ? 'released for shipment' : 'not released'}`, source: `Merchant review record ${short(r.entry_hash)}` })
   if (data.shipment) {
