@@ -31,7 +31,11 @@ export default function ProductsPage() {
                 <p className="eyebrow">{it.short}</p>
                 <h2 id={`${it.id}-h`}>{it.title}</h2>
               </div>
-              <div>{it.paras.map((t) => <p className="para" key={t}>{t}</p>)}</div>
+              <div>
+                {it.paras.map((t) => <p className="para" key={t}>{t}</p>)}
+                {it.image && <img className="feature-shot" src={it.image.src} alt={it.image.alt} loading="lazy" />}
+                {it.cta && <Link className="btn btn-sm feature-cta" to={it.cta.to}>{it.cta.label} <Arrow /></Link>}
+              </div>
             </div>
           </section>
         ))}

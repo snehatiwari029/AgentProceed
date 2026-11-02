@@ -5,8 +5,9 @@
 | Tool | What it does |
 | --- | --- |
 | **Agent Receipt** (flagship) | Order verification: checks each agent order against what the customer authorized, before fulfillment. |
-| **Evidence Packet** | Disputes: builds the evidence pack for a shipped order that is later disputed. |
 | **Listing Optimizer + Read as Agent** | Listing tools: listing fixes for agents, and how a shopping agent reads each listing. |
+| **Evidence Packet** | Disputes: builds the evidence pack for a shipped order that is later disputed. |
+| **Agent Activity tracker** | Dashboard map of every agent session at its pipeline stage (`/dashboard/activity`), with a verdict badge per receipt. Read-only; refreshes every 20 seconds. |
 
 Agent Receipt is the merchant-side check that binds a shopper's intent, a structured grant (VI-aligned demo representation), and the agent's action into a SHA-256 hash-chained receipt, then checks the action against the grant and the merchant's terms. Built for the Meta Global AI Developer Hackathon (submission 4 Nov 2026, 9pm ET). Checkout is simulated. No real payments.
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { content as c } from './content'
-import { Arrow, Fingerprint, iconFor, toolIcon } from './icons'
+import { Arrow, Fingerprint, iconFor } from './icons'
 import HeroScene from './HeroScene'
 import { SiteFooter, SiteHeader } from './Chrome'
 import PilotForm from './PilotForm'
@@ -114,12 +114,16 @@ export default function LandingPage() {
             <p className="eyebrow">{c.whatWeDo.eyebrow}</p>
             <h2 id="partner-h">{c.whatWeDo.headline}</h2>
             <div className="cols">
-              {c.whatWeDo.cards.map((col, i) => (
-                <div className="col" key={col.tag}>
-                  <span className="disc" aria-hidden="true">{toolIcon(i)}</span>
-                  <p className="col-tag">{col.tag}</p>
-                  <h3>{col.title}</h3>
-                  <p>{col.body}</p>
+              {c.whatWeDo.cards.map((col) => (
+                <div className={`col${col.image ? ' col-visual' : ''}`} key={col.tag} data-testid={`feature-${col.icon}`}>
+                  <div className="col-text">
+                    <span className="disc" aria-hidden="true">{iconFor(col.icon)}</span>
+                    <p className="col-tag">{col.tag}</p>
+                    <h3>{col.title}</h3>
+                    <p>{col.body}</p>
+                    {col.cta && <Link className="btn btn-sm feature-cta" to={col.cta.to}>{col.cta.label} <Arrow /></Link>}
+                  </div>
+                  {col.image && <img className="feature-shot" src={col.image.src} alt={col.image.alt} loading="lazy" />}
                 </div>
               ))}
             </div>
@@ -155,9 +159,9 @@ export default function LandingPage() {
             <p className="eyebrow">{c.productsHome.eyebrow}</p>
             <h2 id="products-h">{c.productsHome.headline}</h2>
             <div className="pcols">
-              {c.products.items.map((p, i) => (
+              {c.products.items.map((p) => (
                 <div className="pcol" key={p.id}>
-                  <span className="disc" aria-hidden="true">{toolIcon(i)}</span>
+                  <span className="disc" aria-hidden="true">{iconFor(p.icon)}</span>
                   <h3><Link to={`/products#${p.id}`}>{p.title}</Link></h3>
                   <p>{p.short}</p>
                 </div>

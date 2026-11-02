@@ -29,6 +29,15 @@ export const Shield = ({ size = 26 }: { size?: number }) => (
     <path d="m9 12 2.2 2.2L15.5 10" />
   </svg>
 )
-export const iconFor = (name: string) => (name === 'fingerprint' ? <Fingerprint /> : name === 'package' ? <Package /> : <Shield />)
-// Icon disc per tool: Agent Receipt = shield, Evidence Packet = fingerprint, Listing Optimizer + Read as Agent = package.
-export const toolIcon = (i: number) => (i === 0 ? <Shield /> : i === 1 ? <Fingerprint /> : <Package />)
+// The dashboard map's bot glyph (Agent Activity tracker).
+export const Bot = ({ size = 26 }: { size?: number }) => (
+  <svg {...base} width={size} height={size}>
+    <path d="M12 3v3" />
+    <rect x="4.5" y="6" width="15" height="12" rx="3" />
+    <circle cx="9.5" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="14.5" cy="12" r="1.2" fill="currentColor" />
+    <path d="M9.5 15.5h5M2.5 11v3M21.5 11v3" />
+  </svg>
+)
+// Icon by name: shield = Agent Receipt, package = Listing Optimizer + Read as Agent, fingerprint = Evidence Packet, bot = Agent Activity tracker.
+export const iconFor = (name: string) => (name === 'fingerprint' ? <Fingerprint /> : name === 'package' ? <Package /> : name === 'bot' ? <Bot /> : <Shield />)

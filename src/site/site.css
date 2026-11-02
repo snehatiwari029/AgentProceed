@@ -145,6 +145,11 @@
 .site .col-tag { margin-top: 22px; font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-purple); font-weight: 500; }
 .site .col h3 { font-weight: 700; font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; margin: 10px 0 14px; }
 .site .col p { font-size: 16px; line-height: 1.8; color: var(--c-ink-soft); }
+.site .col-text { display: flex; flex-direction: column; align-items: flex-start; }
+.site .col-visual { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.1fr; gap: 36px; align-items: center; }
+.site .col-visual .feature-shot { margin-top: 0; }
+.site .feature-shot { display: block; width: 100%; height: auto; margin-top: 22px; border-radius: 14px; border: 1px solid var(--c-line); }
+.site .feature-cta { margin-top: 22px; }
 
 /* grant action verdict */
 .site .steps { background: var(--c-gray); padding: 110px 0; }
@@ -161,12 +166,14 @@
 /* products */
 .site .products { background: var(--c-white); padding: 110px 0; }
 .site .products h2, .site .faq h2, .site .pilot h2 { margin-top: 20px; }
-.site .pcols { margin-top: 48px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.site .pcols { margin-top: 48px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
 .site .pcol { background: var(--c-gray); border-radius: var(--card-radius); padding: 30px 30px 32px; }
 .site .pcol h3 { margin-top: 22px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .site .pcol h3 a:hover { color: var(--c-purple); }
 .site .pcol p { margin-top: 10px; font-size: 16px; line-height: 1.75; color: var(--c-ink-soft); }
 .site .more-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 30px; font-weight: 700; font-size: 17px; color: var(--c-purple); }
+
+@media (max-width: 1200px) and (min-width: 961px) { .site .pcols { grid-template-columns: repeat(2, 1fr); } .site .try-list { grid-template-columns: repeat(3, 1fr); } }
 
 /* faq */
 .site .faq { background: var(--c-white); padding: 40px 0 110px; }
@@ -232,7 +239,7 @@
 .site .demo-card .demo-go { margin-top: auto; align-self: flex-start; }
 .site .hack-repo { margin-top: 26px; }
 .site .hack-try { padding: 60px 0 110px; background: var(--c-white); }
-.site .try-list { margin-top: 34px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 0; list-style: none; counter-reset: try; }
+.site .try-list { margin-top: 34px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; padding: 0; list-style: none; counter-reset: try; }
 .site .try-list li { background: var(--c-gray); border-radius: var(--card-radius); padding: 26px 24px; }
 .site .try-list .disc { width: 44px; height: 44px; font-weight: 700; font-size: 18px; }
 .site .try-list h3 { margin-top: 18px; font-size: 20px; font-weight: 700; }
@@ -247,6 +254,8 @@
   .site .gap, .site .steps, .site .products { padding: 70px 0; }
   .site .partner, .site .faq { padding: 20px 0 70px; }
   .site .cols, .site .pcols, .site .demo-grid { grid-template-columns: 1fr; }
+  .site .feature-cta { white-space: nowrap; }
+  .site .col-visual { grid-template-columns: 1fr; gap: 22px; }
   .site .try-list { grid-template-columns: 1fr 1fr; }
   .site .prod-grid { gap: 18px; padding: 28px 22px; }
   .site .nav { gap: 14px; }

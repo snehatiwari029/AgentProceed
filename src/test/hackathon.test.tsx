@@ -18,7 +18,19 @@ describe('Hackathon page', () => {
     expect(screen.getByTestId('demo-dashboard')).toHaveTextContent('pre-filled for Northwind Outfitters')
     expect(screen.getByRole('link', { name: /Source code on GitHub/ })).toHaveAttribute('href', 'https://github.com/snehatiwari029/AgentReceipt')
     const steps = within(screen.getByRole('list')).getAllByRole('heading').map((h) => h.textContent)
-    expect(steps).toEqual(['Chat', 'Store', 'Dashboard attention', 'Mismatch'])
+    expect(steps).toEqual(['Chat', 'Store', 'Dashboard: agent activity map', 'Dashboard attention', 'Mismatch'])
+  })
+
+  it('the fourth feature entry is the Agent Activity tracker: headline, body, live-map screenshot and a link to /dashboard', () => {
+    at('/')
+    const card = screen.getByTestId('feature-bot')
+    expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('See every agent in your store.')
+    expect(card).toHaveTextContent('Each bot icon is a real session record, with a verdict badge for its receipt.')
+    expect(within(card).getByRole('img')).toHaveAttribute('src', '/features/agent-activity-map.jpg')
+    expect(within(card).getByRole('img').getAttribute('alt')).toMatch(/simulated agent traffic/)
+    expect(within(card).getByRole('link', { name: /See it in the dashboard/ })).toHaveAttribute('href', '/dashboard')
+    const tools = within(screen.getByRole('list', { name: 'Tools' })).getAllByRole('link').map((a) => a.textContent)
+    expect(tools).toEqual(['Agent Receipt', 'Listing Optimizer + Read as Agent', 'Evidence Packet', 'Agent Activity tracker'])
   })
 
   it('the main navigation links to /hackathon from the home page', () => {
