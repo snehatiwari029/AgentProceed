@@ -11,16 +11,18 @@ import { DecisionBadge } from '../components/Badges'
 // Agent orders reads, every POLL_MS, so an icon moves only when a stored record changes.
 export const POLL_MS = 20_000
 
-// The storefront artwork is a build-time Muse Image asset (scripts/generate-store-art.ts). Until that file has been
-// generated and committed, this stays null and the map shows plain zones: no stand-in image.
-const STORE_ART: string | null = null
+// The storefront artwork is a build-time Muse Image asset (scripts/generate-store-art.ts, candidate 3 in
+// public/store-art/manifest.json). It carries no text; zone labels are the HTML overlays below.
+const STORE_ART: string | null = '/store-art/candidate-3.webp'
 
-// Zone boxes on the map, in percent of the map area. Labels are HTML, never part of the image.
+// Zone boxes on the map, in percent of the map area, placed over the rooms of the isometric artwork (1920x1280, drawn
+// with background-size: cover in a 16:10 box, so about 3% is cropped from its top and bottom). Labels are HTML, never
+// part of the image.
 const LAYOUT: Record<Zone, { left: number; top: number; width: number; height: number }> = {
-  browse: { left: 3, top: 6, width: 44, height: 40 },
-  displays: { left: 53, top: 6, width: 44, height: 40 },
-  cart: { left: 3, top: 54, width: 44, height: 40 },
-  checkout: { left: 53, top: 54, width: 44, height: 40 },
+  browse: { left: 14.5, top: 30, width: 28, height: 25 },
+  displays: { left: 44, top: 15, width: 25.5, height: 21.5 },
+  cart: { left: 30, top: 57.5, width: 21, height: 23 },
+  checkout: { left: 58.5, top: 38.5, width: 31, height: 33 },
 }
 
 function usePoll(ms: number): number {

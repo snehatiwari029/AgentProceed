@@ -1,7 +1,8 @@
 // BUILD-TIME ONLY: generates the Agent activity map's storefront artwork with Muse Image (muse-image-1.0) through the
 // Meta Model API, once. The chosen file is committed as a static asset; the dashboard never calls an image model.
 //
-// Status: NOT RUN YET. Endpoint from Meta's Muse Image docs: the single-shot POST /v1/images/generations, on the same
+// Status: RUN 2026-11-02. The call returned 200 and the image bytes came back as WebP, so the file extension is now
+// taken from the bytes. Candidate 3 was chosen (public/store-art/manifest.json). Endpoint from Meta's Muse Image docs: the single-shot POST /v1/images/generations, on the same
 // https://api.meta.ai/v1 host as the chat endpoint in supabase/functions/shopper-agent/model.ts. MUSE_IMAGE_URL overrides
 // it. The response shape is NOT verified yet: the script accepts data[0].b64_json or data[0].url and otherwise stops,
 // printing only the response's field names. Pricing is not assumed; confirm it against the project's Meta Model API
@@ -27,6 +28,13 @@ export const PROMPT = [
   'Flat, minimal, simple shapes. No people, no figures, no text, no letters, no numbers, no signage, no logos.',
 ].join(' ')
 
+// Names the file after what the bytes are, not what was asked for: Muse Image returned WebP.
+export function imageExt(bytes: Buffer): 'png' | 'webp' | 'jpg' {
+  if (bytes.subarray(0, 4).toString('latin1') === 'RIFF' && bytes.subarray(8, 12).toString('latin1') === 'WEBP') return 'webp'
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'jpg'
+  return 'png'
+}
+
 async function main() {
   const key = process.env.MODEL_API_KEY?.trim()
   const url = process.env.MUSE_IMAGE_URL?.trim() || DEFAULT_URL
@@ -50,7 +58,7 @@ async function main() {
       const shape = { top: Object.keys(json), first: item ? Object.keys(item) : null }
       throw new Error(`Muse Image response had no data[0].b64_json or data[0].url. Fields seen: ${JSON.stringify(shape)}`)
     }
-    const file = `candidate-${i}.png`
+    const file = `candidate-${i}.${imageExt(bytes)}`
     await writeFile(join(out, file), bytes)
     files.push({ file: `store-art/${file}`, created_at: new Date().toISOString() })
   }
