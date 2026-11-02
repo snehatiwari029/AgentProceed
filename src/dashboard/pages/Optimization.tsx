@@ -290,7 +290,7 @@ function ListingDetail({ listing, suggestions, merchantId, onChanged }: { listin
         Semantic reading: <span className={listing.semantic.source === 'muse-spark' ? 'text-dash-teal' : 'text-dash-attention'}>{listing.semantic.label}</span>. {listing.semantic.reason}
         {parts.length > 0 && <> Spark read the copy as: {parts.map(([k, v]) => `${k} ${JSON.stringify(v)}`).join(', ')}.</>}
       </p>
-      <table className="w-full text-left text-sm">
+      <table className="w-full text-left text-sm" data-tour="pillars">
         <caption className="mb-2 text-left font-semibold text-dash-ink">Pillar 1–5 checklist</caption>
         <thead className="text-xs text-dash-label">
           <tr><th className="py-1 pr-3">Pillar</th><th className="py-1 pr-3">Result</th><th className="py-1">Evidence</th></tr>

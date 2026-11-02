@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AgentAction, Grant, Proposal, Receipt } from '../../shared/schemas'
 import { type Rows } from '../data'
@@ -77,7 +77,7 @@ export async function readActivity(db: Db, merchantName: string = MERCHANT_NAME)
 }
 
 // Re-reads every POLL_MS. Keeps the last good rows while a read is in flight, so the map never blanks between reads.
-function useActivity(): Rows<AgentPosition> {
+export function useActivity(): Rows<AgentPosition> {
   const tick = usePoll(POLL_MS)
   const [state, setState] = useState<Rows<AgentPosition>>({ status: 'loading' })
   useEffect(() => {
@@ -136,7 +136,8 @@ export default function AgentActivity() {
   )
 }
 
-export function ActivityView({ positions }: { positions: AgentPosition[] }) {
+// embedded: the Dashboard home card. Same map, zones, icons and side summary, stacked to fit half the page width.
+export function ActivityView({ positions, embedded = false }: { positions: AgentPosition[]; embedded?: boolean }) {
   const navigate = useNavigate()
   // A short pulse when a session's zone changes between reads. No other motion.
   const seen = useRef(new Map<string, Zone>())
@@ -157,9 +158,11 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
   // Opens the existing Agent orders row (its check, when a receipt exists). No new detail page.
   const openOrder = (p: AgentPosition) => navigate('/dashboard/orders', { state: p.receipt_id ? { openKey: p.receipt_id } : null })
 
+  const MapBox = embedded ? EmbeddedBox : Card
+  const ListBox = embedded ? EmbeddedList : Card
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <Card label="Store map">
+    <div className={embedded ? 'grid gap-3' : 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'}>
+      <MapBox label="Store map">
         <div
           data-testid="store-map"
           className="relative w-full overflow-hidden rounded-lg border border-dash-edge bg-dash-page-bottom"
@@ -179,21 +182,21 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
                 key={z.id}
                 data-zone={z.id}
                 aria-label={`${z.label}: ${here.length}`}
-                className="absolute flex flex-col rounded-md border border-dashed border-dash-edge bg-dash-card/60 p-2"
+                className={`absolute flex flex-col rounded-md border border-dashed border-white/25 bg-dash-page-bottom/70 ${embedded ? 'p-1' : 'p-2'}`}
                 style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
               >
-                <p className="text-xs font-semibold uppercase tracking-wider text-dash-label">
+                <p className={`${embedded ? 'text-[9px] leading-tight tracking-wide' : 'text-xs tracking-wider'} font-semibold uppercase text-dash-label`}>
                   {z.label} <span className="text-dash-body">({here.length})</span>
                 </p>
-                <ul className="mt-1 flex flex-wrap content-start gap-1.5 overflow-auto">
+                <ul className={`mt-1 flex flex-wrap content-start ${embedded ? 'gap-1' : 'gap-1.5'} overflow-auto`}>
                   {here.map((p) => (
                     <li
                       key={p.session_id}
                       data-agent-icon={p.session_id}
                       title={`${p.agent}: ${p.stage}`}
-                      className={`relative rounded-md border border-dash-edge bg-dash-card-raised ${here.length > DENSE ? 'p-0.5' : 'p-1'} text-dash-teal ${pulse.has(p.session_id) ? 'agent-pulse' : ''}`}
+                      className={`relative rounded-md border border-white/20 bg-dash-navy ${embedded || here.length > DENSE ? 'p-0.5' : 'p-1'} text-dash-teal ${pulse.has(p.session_id) ? 'agent-pulse' : ''}`}
                     >
-                      <BotIcon size={here.length > DENSE ? 16 : 22} />
+                      <BotIcon size={embedded ? 10 : here.length > DENSE ? 16 : 22} />
                       <span className="sr-only">{`${p.agent}, ${p.stage}`}</span>
                       {p.decision && (
                         <span
@@ -209,23 +212,23 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
             )
           })}
         </div>
-        <p className="mt-2 text-xs text-dash-label">Stylized store layout.</p>
-        <p className="mt-1 text-xs text-dash-label" data-testid="stage-legend">
+        <p className={`mt-2 text-xs ${embedded ? 'text-dash-navy/80' : 'text-dash-label'}`}>Stylized store layout.</p>
+        <p className={`mt-1 text-xs ${embedded ? 'text-dash-navy/80' : 'text-dash-label'}`} data-testid="stage-legend">
           Each zone is a record stage. Entrance and browse aisles: session opened, no grant yet. Product displays: grant
           recorded. Cart area: proposal presented. Checkout line: order placed, or verdict issued.
         </p>
-        <p className="mt-1 text-xs text-dash-label">
+        <p className={`mt-1 text-xs ${embedded ? 'text-dash-navy/80' : 'text-dash-label'}`}>
           Not the merchant's floorplan or a camera view. Icons move only when a stored record changes; the map refreshes every{' '}
           {POLL_MS / 1000} seconds.
         </p>
-      </Card>
+      </MapBox>
 
-      <Card label="Agents in store">
+      <ListBox label="Agents in store">
         <p className="text-sm font-semibold text-dash-ink" role="status" data-testid="activity-summary">
           {summary(positions)}
         </p>
         {positions.length > 0 && (
-          <ul className="mt-3 divide-y divide-dash-edge">
+          <ul className={`mt-3 divide-y divide-dash-edge ${embedded ? 'max-h-60 overflow-auto' : ''}`}>
             {positions.map((p) => {
               const body = (
                 <>
@@ -262,7 +265,15 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
             })}
           </ul>
         )}
-      </Card>
+      </ListBox>
     </div>
   )
+}
+
+// Home card wrappers: the map sits straight on the lavender card; the side summary is a dark inset so its text stays readable.
+function EmbeddedBox({ children, label }: { children: ReactNode; label?: string }) {
+  return <section aria-label={label}>{children}</section>
+}
+function EmbeddedList({ children, label }: { children: ReactNode; label?: string }) {
+  return <section aria-label={label} className="rounded-xl bg-dash-navy p-3 text-dash-body">{children}</section>
 }

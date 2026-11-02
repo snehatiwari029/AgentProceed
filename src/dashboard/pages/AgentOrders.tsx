@@ -165,6 +165,7 @@ export default function AgentOrders() {
               the database live, so nothing needs to change when they arrive.
             </Empty>
           ) : (
+            <div data-tour="receipt-page">
             <Card label="Agent orders">
               <p className="mb-3 text-sm font-semibold text-dash-ink" role="status">
                 Orders requiring attention: <span className="text-dash-attention">{rows.filter(needsAttention).length}</span>
@@ -258,6 +259,7 @@ export default function AgentOrders() {
                   )
                 })}
             </Card>
+            </div>
           )
         }
       </Live>
