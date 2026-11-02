@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AgentAction, Grant, Proposal, Receipt } from '../../shared/schemas'
-import { useRows, type Rows } from '../data'
+import { type Rows } from '../data'
+import { supabase } from '../../shared/supabase'
 import { MERCHANT_NAME } from '../disputes'
 import { buildPositions, summary, ZONES, type ActivitySession, type AgentPosition, type Zone } from '../activity'
 import { Card, Live, PageTitle } from '../components/Panel'
@@ -16,14 +17,18 @@ export const POLL_MS = 20_000
 const STORE_ART: string | null = '/store-art/candidate-3.webp'
 
 // Zone boxes on the map, in percent of the map area, placed over the rooms of the isometric artwork (1920x1280, drawn
-// with background-size: cover in a 16:10 box, so about 3% is cropped from its top and bottom). Labels are HTML, never
-// part of the image.
+// with background-size: cover in a 16:10 box, so about 3% is cropped from its top and bottom). The artwork's checkout
+// queue rails stand in the cart room (about x 51-63%, y 61-73%), so the checkout box sits on the rails and the cart box
+// stops short of them. Labels are HTML, never part of the image.
 const LAYOUT: Record<Zone, { left: number; top: number; width: number; height: number }> = {
   browse: { left: 14.5, top: 30, width: 28, height: 25 },
   displays: { left: 44, top: 15, width: 25.5, height: 21.5 },
-  cart: { left: 30, top: 57.5, width: 21, height: 23 },
-  checkout: { left: 58.5, top: 38.5, width: 31, height: 33 },
+  cart: { left: 29, top: 57, width: 21, height: 24 },
+  checkout: { left: 50.5, top: 54, width: 17, height: 26 },
 }
+
+// Above this many icons in one zone, icons are drawn smaller so a full checkout line still fits on the rails.
+const DENSE = 4
 
 function usePoll(ms: number): number {
   const [n, setN] = useState(0)
@@ -34,25 +39,62 @@ function usePoll(ms: number): number {
   return n
 }
 
-// Keeps the last good rows while a poll is in flight, so the map never blanks between reads.
+type Db = NonNullable<typeof supabase>
+type Res = PromiseLike<{ data: unknown; error: { message: string } | null }>
+
+async function read<T>(q: Res): Promise<T[]> {
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []) as T[]
+}
+
+// Scoped to the demo merchant in the queries themselves: the merchant is looked up by name, then only its sessions,
+// the grants on those sessions, the proposals and actions on those grants, and its own receipts are read. This is
+// query-level filtering for the demo merchant only. It is not row-level security: no RLS policy restricts these tables
+// per merchant. buildPositions filters again by merchant as a second check.
+export async function readActivity(db: Db, merchantName: string = MERCHANT_NAME): Promise<AgentPosition[]> {
+  const [merchant] = await read<{ id: string; name: string }>(db.from('merchants').select('id,name').eq('name', merchantName))
+  if (!merchant) return []
+  const sessions = await read<ActivitySession>(
+    db.from('sessions').select('*').eq('merchant_id', merchant.id).order('opened_at', { ascending: true }),
+  )
+  if (sessions.length === 0) return []
+  const grants = await read<Grant>(
+    db.from('grants').select('*').in('session_id', sessions.map((s) => s.id)).order('chain_seq', { ascending: true }),
+  )
+  const grantIds = grants.map((g) => g.id)
+  const [proposals, actions, receipts] =
+    grantIds.length === 0
+      ? [[], [], []]
+      : await Promise.all([
+          read<Proposal>(db.from('proposals').select('*').in('grant_id', grantIds).order('chain_seq', { ascending: true })),
+          read<AgentAction>(db.from('actions').select('*').in('grant_id', grantIds).order('chain_seq', { ascending: true })),
+          read<Receipt>(
+            db.from('receipts').select('*').eq('merchant_id', merchant.id).in('grant_id', grantIds).order('chain_seq', { ascending: true }),
+          ),
+        ])
+  return buildPositions(merchant.id, sessions, grants, proposals, actions, receipts)
+}
+
+// Re-reads every POLL_MS. Keeps the last good rows while a read is in flight, so the map never blanks between reads.
 function useActivity(): Rows<AgentPosition> {
   const tick = usePoll(POLL_MS)
-  const merchants = useRows<{ id: string; name: string }>('merchants', 'name', true)
-  const sessions = useRows<ActivitySession>('sessions', 'opened_at', true, tick)
-  const grants = useRows<Grant>('grants', 'chain_seq', true, tick)
-  const proposals = useRows<Proposal>('proposals', 'chain_seq', true, tick)
-  const actions = useRows<AgentAction>('actions', 'chain_seq', true, tick)
-  const receipts = useRows<Receipt>('receipts', 'chain_seq', true, tick)
-  const all: Rows<unknown>[] = [merchants, sessions, grants, proposals, actions, receipts]
-  const failed = all.find((s) => s.status === 'error')
-  if (failed) return failed as Rows<AgentPosition>
-  if (all.some((s) => s.status === 'loading')) return { status: 'loading' }
-  const rows = <T,>(s: Rows<T>) => (s as { rows: T[] }).rows
-  const merchant = rows(merchants).find((m) => m.name === MERCHANT_NAME) ?? null
-  return {
-    status: 'ready',
-    rows: buildPositions(merchant?.id ?? null, rows(sessions), rows(grants), rows(proposals), rows(actions), rows(receipts)),
-  }
+  const [state, setState] = useState<Rows<AgentPosition>>({ status: 'loading' })
+  useEffect(() => {
+    let cancelled = false
+    if (!supabase) {
+      setState({ status: 'error', message: 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.' })
+      return
+    }
+    readActivity(supabase).then(
+      (rows) => !cancelled && setState({ status: 'ready', rows }),
+      (err: unknown) => !cancelled && setState({ status: 'error', message: err instanceof Error ? err.message : 'Network error' }),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [tick])
+  return state
 }
 
 // One glyph for every agent. Stage is the zone; verdict is the badge.
@@ -85,8 +127,9 @@ export default function AgentActivity() {
   return (
     <div>
       <PageTitle title="Agent activity">
-        Where each agent session is in the store, read from its session, grant, proposal, action and receipt records.
-        Read-only. Demo store: this is simulated agent traffic, and the verified-agent signal is simulated.
+        Which stage each agent session has reached, read from its session, grant, proposal, action and receipt records and
+        drawn as a place in a stylized store. It shows pipeline stage, not live browsing. Read-only. Demo store: this is
+        simulated agent traffic for {MERCHANT_NAME} only, and the verified-agent signal is simulated.
       </PageTitle>
       <Live state={state}>{(rows) => <ActivityView positions={rows} />}</Live>
     </div>
@@ -148,9 +191,9 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
                       key={p.session_id}
                       data-agent-icon={p.session_id}
                       title={`${p.agent}: ${p.stage}`}
-                      className={`relative rounded-md border border-dash-edge bg-dash-card-raised p-1 text-dash-teal ${pulse.has(p.session_id) ? 'agent-pulse' : ''}`}
+                      className={`relative rounded-md border border-dash-edge bg-dash-card-raised ${here.length > DENSE ? 'p-0.5' : 'p-1'} text-dash-teal ${pulse.has(p.session_id) ? 'agent-pulse' : ''}`}
                     >
-                      <BotIcon />
+                      <BotIcon size={here.length > DENSE ? 16 : 22} />
                       <span className="sr-only">{`${p.agent}, ${p.stage}`}</span>
                       {p.decision && (
                         <span
@@ -167,6 +210,10 @@ export function ActivityView({ positions }: { positions: AgentPosition[] }) {
           })}
         </div>
         <p className="mt-2 text-xs text-dash-label">Stylized store layout.</p>
+        <p className="mt-1 text-xs text-dash-label" data-testid="stage-legend">
+          Each zone is a record stage. Entrance and browse aisles: session opened, no grant yet. Product displays: grant
+          recorded. Cart area: proposal presented. Checkout line: order placed, or verdict issued.
+        </p>
         <p className="mt-1 text-xs text-dash-label">
           Not the merchant's floorplan or a camera view. Icons move only when a stored record changes; the map refreshes every{' '}
           {POLL_MS / 1000} seconds.

@@ -121,7 +121,7 @@ describe('Agent activity: no icon without a record', () => {
     expect(screen.getByTestId('activity-summary')).toHaveTextContent('No agents in store right now.')
     expect(container.querySelectorAll('[data-agent-icon]')).toHaveLength(0)
     // Zone labels are HTML overlays.
-    expect(screen.getByText(/Checkout line/)).toBeInTheDocument()
+    expect(container.querySelector('[data-zone="checkout"]')).toHaveTextContent(/Checkout line/)
     expect(screen.getByText('Stylized store layout.')).toBeInTheDocument()
   })
 })
@@ -147,6 +147,7 @@ describe('Agent activity page on the demo seed', () => {
     mock.next = { data: [], error: null }
     mock.tables = SEEDED
     mock.inserted = []
+    mock.queries = []
     sessionStorage.setItem('agentreceipt-demo-merchant', 'yes')
   })
 
@@ -167,5 +168,35 @@ describe('Agent activity page on the demo seed', () => {
     expect(await screen.findByRole('button', { name: 'Hide check' })).toBeInTheDocument()
     expect(screen.getByText(/AR-2026-\d+: 1 problem found|problems? found/)).toBeInTheDocument()
     expect(mock.inserted).toEqual([])
+  })
+
+  it('scopes every read to the demo merchant in the query, not after fetching everything', async () => {
+    const { container } = render(<MemoryRouter initialEntries={['/dashboard/activity']}><AppRoutes /></MemoryRouter>)
+    await screen.findByTestId('store-map')
+    await vi.waitFor(() => expect(container.querySelectorAll('[data-agent-icon]')).toHaveLength(seededSessions))
+    const q = (t: string) => mock.queries.filter((x) => x.table === t)
+    const sessionIds = SEEDED.sessions.data as { id: string; merchant_id: string }[]
+    const mine = sessionIds.filter((s) => s.merchant_id === MERCHANT_ID).map((s) => s.id)
+    expect(q('merchants').every((x) => x.filters.some((f) => f.op === 'eq' && f.col === 'name' && f.val === 'Northwind Outfitters'))).toBe(true)
+    expect(q('sessions').length).toBeGreaterThan(0)
+    expect(q('sessions').every((x) => x.filters.some((f) => f.op === 'eq' && f.col === 'merchant_id' && f.val === MERCHANT_ID))).toBe(true)
+    for (const x of q('grants')) {
+      const f = x.filters.find((y) => y.col === 'session_id')
+      expect(f?.op).toBe('in')
+      expect([...(f?.val as string[])].sort()).toEqual([...mine].sort())
+    }
+    for (const t of ['proposals', 'actions']) expect(q(t).every((x) => x.filters.some((f) => f.op === 'in' && f.col === 'grant_id'))).toBe(true)
+    expect(q('receipts').every((x) => x.filters.some((f) => f.op === 'eq' && f.col === 'merchant_id' && f.val === MERCHANT_ID))).toBe(true)
+    expect(q('receipts').every((x) => x.filters.some((f) => f.op === 'in' && f.col === 'grant_id'))).toBe(true)
+    expect(mock.queries.every((x) => x.filters.length > 0)).toBe(true)
+    expect(mock.inserted).toEqual([])
+  })
+
+  it('says the zones are pipeline stages, not live browsing', async () => {
+    render(<MemoryRouter initialEntries={['/dashboard/activity']}><AppRoutes /></MemoryRouter>)
+    await screen.findByTestId('store-map')
+    expect(screen.getByText(/pipeline stage, not live browsing/)).toBeInTheDocument()
+    expect(screen.getByTestId('stage-legend')).toHaveTextContent('Entrance and browse aisles: session opened, no grant yet.')
+    expect(screen.getByText('Stylized store layout.')).toBeInTheDocument()
   })
 })
