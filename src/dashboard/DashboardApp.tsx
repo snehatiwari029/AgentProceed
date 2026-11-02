@@ -5,12 +5,14 @@ import Home from './pages/Home'
 import AgentOrders from './pages/AgentOrders'
 import Disputes from './pages/Disputes'
 import Optimization from './pages/Optimization'
+import AgentActivity from './pages/AgentActivity'
 import Tour, { TourOffer } from './Tour'
 import { clearTourOffer, isSignedIn, peekTourOffer, signIn, signOut } from './session'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', end: true },
   { to: '/dashboard/orders', label: 'Agent orders', end: false },
+  { to: '/dashboard/activity', label: 'Agent activity', end: false },
   { to: '/dashboard/disputes', label: 'Disputes', end: false },
   { to: '/dashboard/optimization', label: 'Optimization for Agents', end: false },
 ]
@@ -84,6 +86,7 @@ export default function DashboardApp() {
         <Routes>
           <Route index element={<Home />} />
           <Route path="orders" element={<AgentOrders />} />
+          <Route path="activity" element={<AgentActivity />} />
           <Route path="disputes" element={<Disputes />} />
           <Route path="optimization" element={<Optimization />} />
           <Route path="optimize" element={<Optimization />} />

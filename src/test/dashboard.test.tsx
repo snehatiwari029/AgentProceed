@@ -35,10 +35,10 @@ describe('Dashboard and routing', () => {
     expect(await screen.findByText(/products in the store/)).toHaveTextContent('products in the store')
     const nav = screen.getByRole('navigation', { name: 'Dashboard' })
     expect(nav).toHaveTextContent('Dashboard')
-    for (const label of ['Dashboard', 'Agent orders', 'Disputes', 'Optimization for Agents']) {
+    for (const label of ['Dashboard', 'Agent orders', 'Agent activity', 'Disputes', 'Optimization for Agents']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Dashboard', 'Agent orders', 'Disputes', 'Optimization for Agents'])
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Dashboard', 'Agent orders', 'Agent activity', 'Disputes', 'Optimization for Agents'])
     expect(nav).not.toHaveTextContent(/tamper/i)
   })
 

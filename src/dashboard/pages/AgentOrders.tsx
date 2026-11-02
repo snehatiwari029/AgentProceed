@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { Decision, Dispute, DisputeEvent, Grant, MismatchResult, Receipt } from '../../shared/schemas'
 import { formatMoney } from '../../shared/format'
 import { num, str, useRows, type Rows } from '../data'
@@ -128,7 +129,12 @@ export function withProductName(rows: MismatchResult[], snapshot: Record<string,
 
 export default function AgentOrders() {
   const state = useAgentOrders()
-  const [open, setOpen] = useState<string | null>(null)
+  // Agent activity links here with { openKey: <receipt id> } to open that order's existing check.
+  const location = useLocation()
+  const [open, setOpen] = useState<string | null>(() => {
+    const key = (location.state as { openKey?: unknown } | null)?.openKey
+    return typeof key === 'string' ? key : null
+  })
   const [openRef, setOpenRef] = useState<string | null>(null)
 
   // The guided tour asks for one order's check to be shown, by order number.
