@@ -58,3 +58,18 @@ body {
   outline-offset: 4px;
   border-radius: 6px;
 }
+
+/* Agent activity map: one short pulse when an agent's stage changes. No idle or continuous motion. */
+@keyframes agent-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(45 212 191 / 0.7); }
+  100% { box-shadow: 0 0 0 10px rgb(45 212 191 / 0); }
+}
+.agent-pulse {
+  animation: agent-pulse 1s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-pulse {
+    animation: none;
+    outline: 2px solid var(--color-dash-teal);
+  }
+}

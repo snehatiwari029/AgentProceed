@@ -10,6 +10,8 @@ export const mock = {
   // Rows passed to insert(), and the error the next insert returns.
   inserted: [] as { table: string; row: unknown }[],
   insertError: null as { message: string } | null,
+  // Every read that was answered: its table and the eq()/in() filters it carried, in call order.
+  queries: [] as { table: string; filters: { op: 'eq' | 'in'; col: string; val: unknown }[] }[],
 }
 
 export const fakeClient = {
@@ -19,19 +21,21 @@ export const fakeClient = {
       mock.inserted.push({ table, row })
       return { data: null, error: null }
     },
-    select: () => query(table, []),
+    select: () => query(table, [], []),
   }),
 }
 
 // select() supports order(), and eq() / in() filters applied to the table's rows, as the real client does.
 type Filter = (row: Record<string, unknown>) => boolean
-function query(table: string, filters: Filter[]) {
+type Logged = { op: 'eq' | 'in'; col: string; val: unknown }
+function query(table: string, filters: Filter[], log: Logged[]) {
   return {
-    order: () => query(table, filters),
-    eq: (col: string, val: unknown) => query(table, [...filters, (r) => r[col] === val]),
-    in: (col: string, vals: unknown[]) => query(table, [...filters, (r) => vals.includes(r[col])]),
+    order: () => query(table, filters, log),
+    eq: (col: string, val: unknown) => query(table, [...filters, (r) => r[col] === val], [...log, { op: 'eq', col, val }]),
+    in: (col: string, vals: unknown[]) => query(table, [...filters, (r) => vals.includes(r[col])], [...log, { op: 'in', col, val: vals }]),
     then: (ok: (r: Result) => void) => {
       if (mock.hang || mock.hangOn.includes(table)) return
+      mock.queries.push({ table, filters: log })
       const res = mock.tables[table] ?? mock.next
       ok(filters.length && Array.isArray(res.data) ? { ...res, data: (res.data as Record<string, unknown>[]).filter((r) => filters.every((f) => f(r))) } : res)
     },

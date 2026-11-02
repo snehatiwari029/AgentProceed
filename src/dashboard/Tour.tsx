@@ -14,7 +14,7 @@ const STEPS: Step[] = [
   {
     route: '/dashboard/orders',
     title: 'Order just arrived',
-    body: 'The order the agent just placed: Burton Spellbinder, $509.95 total. AgentReceipt checked it the moment it arrived, before fulfillment.',
+    body: 'The order the agent just placed: Burton Spellbinder, $509.95 total. Agent Receipt checked it the moment it arrived, before fulfillment.',
     target: (hero) => `tr[data-order-ref="${hero}"]`,
   },
   {
@@ -41,13 +41,13 @@ const STEPS: Step[] = [
   {
     route: '/dashboard/disputes',
     title: 'Scenario B: a separate order',
-    body: 'Order 13422, Orca $489.83: 0 problems, Pass. Shipped, delivered, then disputed under Visa 10.4 as “agent overstep”. AgentReceipt built the evidence package from the record; the merchant fought it and reported Won. This is a separate order, not the hero order.',
+    body: 'Order 13422, Orca $489.83: 0 problems, Pass. Shipped, delivered, then disputed under Visa 10.4 as “agent overstep”. Evidence Packet built the dispute evidence from the record; the merchant fought it and reported Won. This is a separate order, not the hero order.',
     target: () => '[data-dispute-order="13422"]',
   },
   {
     route: '/dashboard/orders',
     title: 'Hold for Suspicion',
-    body: 'Order 14522 came from an unverified agent: no session, no receipt. AgentReceipt records the gap and holds it for suspicion. There is no verdict table, because there is no record to check.',
+    body: 'Order 14522 came from an unverified agent: no session, no receipt. Agent Receipt records the gap and holds it for suspicion. There is no verdict table, because there is no record to check.',
     target: () => 'tr[data-order-ref="14522"]',
   },
 ]

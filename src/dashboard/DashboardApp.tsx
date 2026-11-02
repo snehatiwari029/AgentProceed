@@ -5,14 +5,16 @@ import Home from './pages/Home'
 import AgentOrders from './pages/AgentOrders'
 import Disputes from './pages/Disputes'
 import Optimization from './pages/Optimization'
+import AgentActivity from './pages/AgentActivity'
 import Tour, { TourOffer } from './Tour'
 import { clearTourOffer, isSignedIn, peekTourOffer, signIn, signOut } from './session'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', end: true },
   { to: '/dashboard/orders', label: 'Agent orders', end: false },
+  { to: '/dashboard/activity', label: 'Agent activity', end: false },
   { to: '/dashboard/disputes', label: 'Disputes', end: false },
-  { to: '/dashboard/optimization', label: 'Optimization for Agents', end: false },
+  { to: '/dashboard/optimization', label: 'Listing Optimizer', end: false },
 ]
 
 // The merchant dashboard. Dark theme only. It reaches the store through an internal route.
@@ -37,7 +39,7 @@ export default function DashboardApp() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-dash-page-top to-dash-page-bottom text-dash-body md:flex">
       <aside className="border-b border-dash-edge bg-dash-card p-4 md:min-h-screen md:w-56 md:border-b-0 md:border-r">
-        <p className="text-lg font-bold text-dash-ink">AgentReceipt</p>
+        <p className="text-lg font-bold text-dash-ink">Agent Proceed</p>
         <p className="text-xs text-dash-label">Northwind Outfitters</p>
         <button
           type="button"
@@ -84,6 +86,7 @@ export default function DashboardApp() {
         <Routes>
           <Route index element={<Home />} />
           <Route path="orders" element={<AgentOrders />} />
+          <Route path="activity" element={<AgentActivity />} />
           <Route path="disputes" element={<Disputes />} />
           <Route path="optimization" element={<Optimization />} />
           <Route path="optimize" element={<Optimization />} />

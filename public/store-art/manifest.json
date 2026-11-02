@@ -1,0 +1,13 @@
+{
+  "model": "muse-image-1.0",
+  "endpoint": "https://api.meta.ai/v1/images/generations",
+  "prompt": "Clean isometric illustration of a small retail store interior, seen from above at an angle. Muted, low-contrast palette of deep navy, slate and soft teal that sits on a dark dashboard background. Four clearly separated zones arranged as a 2 by 2 grid: top left the entrance and browse aisles, top right product display stands, bottom left a cart area, bottom right a checkout counter with a short queue lane. Flat, minimal, simple shapes. No people, no figures, no text, no letters, no numbers, no signage, no logos.",
+  "candidates": [
+    {
+      "file": "store-art/candidate-3.webp",
+      "created_at": "2026-11-02T04:15:51.102Z"
+    }
+  ],
+  "chosen": "store-art/candidate-3.webp",
+  "format_note": "Muse Image returned WebP bytes; the script originally saved them with a .png name. Unchosen candidates 1 and 2 were deleted."
+}

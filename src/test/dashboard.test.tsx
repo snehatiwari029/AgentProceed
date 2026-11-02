@@ -35,10 +35,10 @@ describe('Dashboard and routing', () => {
     expect(await screen.findByText(/products in the store/)).toHaveTextContent('products in the store')
     const nav = screen.getByRole('navigation', { name: 'Dashboard' })
     expect(nav).toHaveTextContent('Dashboard')
-    for (const label of ['Dashboard', 'Agent orders', 'Disputes', 'Optimization for Agents']) {
+    for (const label of ['Dashboard', 'Agent orders', 'Agent activity', 'Disputes', 'Listing Optimizer']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Dashboard', 'Agent orders', 'Disputes', 'Optimization for Agents'])
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Dashboard', 'Agent orders', 'Agent activity', 'Disputes', 'Listing Optimizer'])
     expect(nav).not.toHaveTextContent(/tamper/i)
   })
 
@@ -74,11 +74,11 @@ describe('Dashboard and routing', () => {
     expect(screen.queryByRole('button', { name: 'Verify chain' })).not.toBeInTheDocument()
   })
 
-  it('/dashboard/optimize opens the Optimization for Agents page', async () => {
+  it('/dashboard/optimize opens the Listing Optimizer page', async () => {
     const user = userEvent.setup()
     at('/dashboard/optimize')
     await user.click(screen.getByRole('button', { name: /sign in as demo merchant/i }))
-    expect(await screen.findByRole('heading', { name: 'Optimization for Agents' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Listing Optimizer' })).toBeInTheDocument()
   })
 
   it('a direct login shows a Start tour button and no tour offer', async () => {
@@ -104,6 +104,6 @@ describe('Dashboard and routing', () => {
     await user.click(screen.getByRole('button', { name: 'Skip' }))
     expect(screen.getByText('Tour complete — explore on your own now.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close tour' }))
-    expect(await screen.findByRole('heading', { name: 'Optimization for Agents' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Listing Optimizer' })).toBeInTheDocument()
   })
 })
