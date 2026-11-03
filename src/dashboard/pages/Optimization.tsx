@@ -122,9 +122,11 @@ function Workspace({ merchant, scan, suggestions, onChanged }: {
           <div className="flex flex-wrap items-start gap-3">
             <button
               type="button" onClick={scanNow} disabled={busy !== null}
-              className="rounded-md border border-dash-teal px-4 py-2 text-sm font-semibold text-dash-teal hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={busy === 'scan' ? 'Scanning…' : 'Read as Agent Scan'}
+              className="flex flex-col items-center rounded-md border border-dash-teal px-4 py-1.5 leading-tight hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busy === 'scan' ? 'Scanning…' : 'Scan Now'}
+              <span className="text-xs font-semibold text-dash-lavender">Read as Agent</span>
+              <span className="text-sm font-bold text-dash-teal">{busy === 'scan' ? 'Scanning…' : 'Scan'}</span>
             </button>
             <div className="max-w-xs">
               <button
@@ -135,7 +137,7 @@ function Workspace({ merchant, scan, suggestions, onChanged }: {
               </button>
               <p className="mt-1 text-xs text-dash-label">
                 Approves the pending suggestions shown below. It does not apply them: no listing, price, term or page
-                changes. You apply each fix in your store, then Scan Now verifies it. Suggestions with an empty
+                changes. You apply each fix in your store, then Read as Agent Scan verifies it. Suggestions with an empty
                 To-be-filled field stay pending.
               </p>
               {needValue > 0 && (
@@ -152,7 +154,7 @@ function Workspace({ merchant, scan, suggestions, onChanged }: {
       </Card>
 
       {!scan ? (
-        <Empty title="No scan yet.">Click Scan Now to scan your listings. Results come only from a scan of your live catalogue.</Empty>
+        <Empty title="No scan yet.">Click Read as Agent Scan to scan your listings. Results come only from a scan of your live catalogue.</Empty>
       ) : (
         <>
           <ScanSummary scan={scan} suggestions={current} />

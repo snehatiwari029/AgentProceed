@@ -561,20 +561,20 @@ describe('Optimization for Agents', () => {
     vi.unstubAllGlobals()
   })
 
-  it('before any scan shows Scan Now and an empty state, not seeded checklist text', async () => {
+  it('before any scan shows Read as Agent Scan and an empty state, not seeded checklist text', async () => {
     mock.tables = { merchants: NORTHWIND }
     open('/dashboard/optimization')
     expect(await screen.findByRole('heading', { name: 'Listing Optimizer' })).toBeInTheDocument()
     expect(await screen.findByText('No scan yet.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Scan Now' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Read as Agent Scan' })).toBeInTheDocument()
     expect(screen.queryByTestId('optimizer-listing')).not.toBeInTheDocument()
   })
 
-  it('Scan Now calls the optimizer function with this merchant only', async () => {
+  it('Read as Agent Scan calls the optimizer function with this merchant only', async () => {
     const user = userEvent.setup()
     mock.tables = { merchants: NORTHWIND }
     open('/dashboard/optimization')
-    await user.click(await screen.findByRole('button', { name: 'Scan Now' }))
+    await user.click(await screen.findByRole('button', { name: 'Read as Agent Scan' }))
     expect(calls).toEqual([{ url: 'https://project.test/functions/v1/optimizer', body: { action: 'scan', merchant_id: NW } }])
     expect(await screen.findByText(/Scan finished: 9 listings/)).toBeInTheDocument()
   })
