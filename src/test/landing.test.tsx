@@ -49,10 +49,26 @@ describe('Home page', () => {
     for (const id of ['how-it-works', 'faq', 'pilot']) expect(document.getElementById(id)).not.toBeNull()
   })
 
-  it('problem section uses the new heading and body', () => {
-    home()
-    expect(screen.getByRole('heading', { name: 'You see the order, not the authorization.' })).toBeInTheDocument()
-    expect(screen.getByText(/it's he-said-she-said, and you lose\./)).toBeInTheDocument()
+  it('problem section: headline, intro line and four one-line problems, each tagged to its feature entry; between hero and features', () => {
+    const { container } = home()
+    const h = screen.getByRole('heading', { name: 'AI agents are the new shoppers. Merchants are flying blind.' })
+    expect(screen.getByText('Payment networks and banks solved trust for shoppers. Merchants are still left without tools.')).toBeInTheDocument()
+    const section = h.closest('section') as HTMLElement
+    const cards = within(within(section).getByRole('list', { name: 'Problems' })).getAllByRole('listitem')
+    expect(cards.map((c) => c.querySelector('.problem-line')?.textContent)).toEqual([
+      'Listings agents cannot read.', 'Orders merchants cannot verify.', 'Disputes with no playbook.', 'No view of what agents are doing in their store.',
+    ])
+    const tags = cards.map((c) => within(c).getByRole('link'))
+    expect(tags.map((t) => t.textContent?.trim())).toEqual(['Solved by Agent Optimize', 'Solved by Agent Receipt', 'Solved by Agent Dispute', 'Solved by Agent Activity'])
+    // each tag links to a feature entry that exists on the page
+    for (const t of tags) expect(container.querySelector(t.getAttribute('href')!)).not.toBeNull()
+    expect(tags.map((t) => t.getAttribute('href'))).toEqual(['#feature-listing-optimizer', '#feature-agent-receipt', '#feature-evidence-packet', '#feature-agent-activity'])
+    expect(container.querySelector('#feature-agent-activity')).toBe(screen.getByTestId('feature-bot'))
+    // no paragraph body copy in the section: only the intro line and the four problem lines
+    expect(section.querySelectorAll('p').length).toBe(1 + 1 + 4)
+    // order: hero, then the problem section, then the features
+    const order = [...container.querySelectorAll('main > section')].map((x) => x.className.split(' ')[0])
+    expect(order.slice(0, 3)).toEqual(['hero', 'gap', 'partner'])
   })
 
   it('What we do for you: four feature entries in order, ending with the Agent Activity tracker (no "Fix it")', () => {

@@ -131,11 +131,17 @@
 .site .tag.good { border-left-color: var(--c-teal); bottom: 4px; left: 4px; }
 .site .side-note { position: absolute; right: -6px; bottom: 24px; font-family: var(--f-mono); font-size: 13px; color: var(--c-ink-faint); }
 
-/* the authorization gap */
-.site .gap { background: var(--c-white); padding: 110px 0 90px; }
-.site .gap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-.site .gap h2 { margin-top: 20px; }
-.site .gap-body { margin-top: 26px; font-size: clamp(17px, 1.4vw, 19px); line-height: 1.85; color: var(--c-ink-soft); }
+/* the problem: four one-line blocks, each tagged with the feature that solves it */
+.site .gap { background: var(--c-white); padding: 100px 0 60px; }
+.site .gap h2 { margin-top: 20px; max-width: 900px; }
+.site .gap-intro { margin-top: 20px; max-width: 760px; font-size: clamp(18px, 1.5vw, 21px); line-height: 1.6; color: var(--c-ink-soft); }
+.site .problem-grid { margin-top: 40px; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.site .problem-card { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 22px; background: var(--c-gray); border-radius: var(--card-radius); padding: 26px 24px; }
+.site .problem-line { font-size: clamp(19px, 1.6vw, 22px); font-weight: 700; line-height: 1.3; letter-spacing: -0.015em; color: var(--c-ink); }
+.site .solved-tag { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); background: var(--c-purple-tint); color: var(--c-purple); font-size: 14px; font-weight: 700; }
+.site .solved-tag svg { width: 16px; height: 16px; }
+.site .solved-tag:hover { background: var(--c-purple); color: var(--c-white); }
+.site .col { scroll-margin-top: 96px; }
 
 /* what we do: light gray rounded cards with icon discs */
 .site .partner { background: var(--c-white); padding: 40px 0 110px; }
@@ -162,6 +168,8 @@
 .site .step-ico { order: 1; width: 54px; height: 54px; border-radius: 50%; background: var(--c-purple); color: var(--c-white); display: grid; place-items: center; }
 .site .step-line { order: 2; font-size: clamp(18px, 1.6vw, 22px); font-weight: 600; letter-spacing: -0.01em; color: var(--c-ink); }
 .site .step-note { margin-top: 22px; font-size: 16px; line-height: 1.8; color: var(--c-ink-soft); max-width: 640px; }
+
+.site .steps .card-stage { margin-top: 30px; padding: 70px 0 40px; }
 
 /* products */
 .site .products { background: var(--c-white); padding: 110px 0; }
@@ -249,11 +257,12 @@
 /* phones and tablets */
 @media (max-width: 960px) {
   .site .hero { padding: 36px 0 64px; }
-  .site .hero-grid, .site .gap-grid, .site .steps-grid, .site .faq-grid, .site .pilot-grid, .site .prod-grid { grid-template-columns: 1fr; }
+  .site .hero-grid, .site .steps-grid, .site .faq-grid, .site .pilot-grid, .site .prod-grid { grid-template-columns: 1fr; }
   .site .hero-scene { max-width: 460px; }
   .site .gap, .site .steps, .site .products { padding: 70px 0; }
   .site .partner, .site .faq { padding: 20px 0 70px; }
   .site .cols, .site .pcols, .site .demo-grid { grid-template-columns: 1fr; }
+  .site .problem-grid { grid-template-columns: 1fr 1fr; }
   .site .feature-cta { white-space: nowrap; }
   .site .col-visual { grid-template-columns: 1fr; gap: 22px; }
   .site .try-list { grid-template-columns: 1fr 1fr; }
@@ -271,6 +280,7 @@
   .site .prod-cta .wrap > div { padding: 36px 24px; }
 }
 @media (max-width: 560px) {
+  .site .problem-grid { grid-template-columns: 1fr; }
   .site .try-list { grid-template-columns: 1fr; }
   .site .header-in { height: 64px; gap: 10px; }
   .site .logo svg { width: 24px; height: 24px; }
