@@ -34,6 +34,12 @@ export function sparkInput(row: Row) {
   }
 }
 
+// A deconstruction depends only on what Spark is sent (the listing's own fields), the model and the prompt.
+// Same key = same question, so the last Spark answer can be reused instead of asking again.
+export function deconstructKey(row: Row): string {
+  return JSON.stringify({ model: MODEL_NAME, prompt: SYSTEM, input: sparkInput(row) })
+}
+
 const str = (v: unknown) => (typeof v === 'string' && v.trim() !== '' && v.trim().toLowerCase() !== 'null' ? v.trim() : null)
 
 // Anti-invention guard: a value Spark returns is kept only if the listing's own text contains it.

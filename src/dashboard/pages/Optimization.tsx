@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRows } from '../data'
 import { Card, Empty, Live, PageTitle } from '../components/Panel'
@@ -79,6 +79,16 @@ function Workspace({ merchant, scan, suggestions, onChanged }: {
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [filters, setFilters] = useState<Filters>({ pillar: 'all', type: 'all' })
+  // Blind read-tests finish after the scan replies. While any is still running on a recent scan, re-read the page data.
+  const refresh = useRef(onChanged)
+  refresh.current = onChanged
+  const readsRunning = !!scan?.results.some((r) => r.read_test?.source === 'pending') &&
+    Date.now() - new Date(scan!.scanned_at).getTime() < 180_000
+  useEffect(() => {
+    if (!readsRunning) return
+    const t = setInterval(() => refresh.current(), 4000)
+    return () => clearInterval(t)
+  }, [readsRunning])
   const current = useMemo(() => {
     const listed = new Set(scan?.results.map((r) => r.product_id) ?? [])
     return suggestions.filter((s) => listed.has(s.product_id))
@@ -336,7 +346,11 @@ function AgentReadTest({ test }: { test: ReadTest }) {
         A shopping agent read this listing as shoppers see it, without your formal terms, and answered four fixed questions.
         Code compared each answer with your formal terms. Nothing here changes your listing.
       </p>
-      {test.source !== 'muse-spark' ? (
+      {test.source === 'pending' ? (
+        <p className="mt-2 text-sm text-dash-body" data-testid="read-test-pending">
+          {test.label}… {test.reason} If this stays for more than a few minutes, press Read as Agent Scan again.
+        </p>
+      ) : test.source !== 'muse-spark' ? (
         <p className="mt-2 text-sm text-dash-attention" data-testid="read-test-unavailable">{test.label}. {test.reason}</p>
       ) : (
         <>

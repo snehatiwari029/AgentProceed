@@ -178,7 +178,8 @@ export interface ReadQuestion {
 }
 
 export interface ReadTest {
-  source: 'muse-spark' | 'unavailable'
+  // 'pending': the blind read is still running in the background; the scan row is updated when it finishes.
+  source: 'muse-spark' | 'unavailable' | 'pending'
   label: string
   reason: string
   today: string
@@ -186,6 +187,7 @@ export interface ReadTest {
   questions: ReadQuestion[]
   dropped: string[]
   summary: string | null
+  answers?: AgentAnswers // Spark's guarded answers, kept so an unchanged listing can be re-compared without a new call
 }
 
 export function addDays(date: string, n: number): string {
@@ -302,6 +304,28 @@ export function unavailable(row: Row, today: string, why: string): ReadTest {
   return { source: 'unavailable', label: UNAVAILABLE_LABEL, reason: why, today, input: readTestInput(row, today), questions: [], dropped: [], summary: null }
 }
 
+export const PENDING_LABEL = 'Agent read-test running'
+export function pending(row: Row, today: string): ReadTest {
+  return {
+    source: 'pending', label: PENDING_LABEL, reason: 'A shopping agent is reading this listing now. Its answers appear here when it finishes.',
+    today, input: readTestInput(row, today), questions: [], dropped: [], summary: null,
+  }
+}
+
+// Same displayed listing, same day: Spark would be sent exactly the same input, so its last answers are reused and
+// code compares them again with the current formal terms. Anything different (listing text, prices, shipping, the
+// date) means a new blind read.
+export function reuseReadTest(prev: ReadTest | undefined | null, row: Row, today: string): ReadTest | null {
+  if (!prev || prev.source !== 'muse-spark' || !prev.answers) return null
+  const input = readTestInput(row, today)
+  if (JSON.stringify(prev.input) !== JSON.stringify(input)) return null
+  const questions = compareReadTest(prev.answers, row, today)
+  return {
+    ...prev, input, today, questions, summary: summaryOf(questions),
+    reason: 'Spark answered the four questions on an earlier scan today; the displayed listing is unchanged, so code compared those answers with your formal terms again.',
+  }
+}
+
 export async function runReadTest(row: Row, reader: AgentReader, today: string): Promise<ReadTest> {
   const input = readTestInput(row, today)
   const res = await reader.read(input).catch(() => ({ ok: false as const, why: 'call failed' }))
@@ -312,7 +336,7 @@ export async function runReadTest(row: Row, reader: AgentReader, today: string):
   return {
     source: 'muse-spark', label: 'Muse Spark, blind read of the displayed listing', reason: 'Spark answered the four questions; code compared each answer with your formal terms.',
     today, input, questions, dropped: answers.dropped,
-    summary: summaryOf(questions),
+    summary: summaryOf(questions), answers,
   }
 }
 
