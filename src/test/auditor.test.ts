@@ -106,14 +106,17 @@ async function placeOrder(w: ReturnType<typeof world>, pick: { id: string; ship:
     store: w.store, now: NOW, newId,
   })) as Extract<AgentReply, { type: 'proposals' }> & AgentReply
   expect(first.type).toBe('proposals')
+  // The order system runs in the background (the confirmation does not wait for it); the test waits for it after the reply.
+  let background: Promise<void> | null = null
   const done = await handle(
     { messages: [{ role: 'user', text: CHAT }, { role: 'assistant', text: first.text }, { role: 'user', text: 'Order it. Use my PayPal.' }], draft: first.draft, offers: first.offers },
     {
       model: fake([() => call('place_order', { product_id: pick.id, payment_method: 'PayPal', why: 'Placing your order' })]), store: w.store, now: NOW, newId,
-      onOrderReceived: wire ? async (sid) => void (await runAuditor({ session_id: sid }, { db: w.auditorDb, reader: r, now: NOW, newId })) : undefined,
+      onOrderReceived: wire ? (sid) => (background = runAuditor({ session_id: sid }, { db: w.auditorDb, reader: r, now: NOW, newId }).then(() => undefined)) : undefined,
     },
   )
   expect(done.type).toBe('ordered')
+  await background
   return done as Extract<AgentReply, { type: 'ordered' }> & AgentReply
 }
 

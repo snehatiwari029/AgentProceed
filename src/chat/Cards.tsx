@@ -32,7 +32,7 @@ export function OfferCard({ offer, onPick, disabled }: { offer: OfferCardData; o
   )
 }
 
-export function OrderCard({ order }: { order: OrderData }) {
+export function OrderCard({ order, number = null }: { order: OrderData; number?: string | 'pending' | 'late' | null }) {
   const rows: [string, string][] = [
     ['Item', formatMoney(order.item_price_cents)],
     [order.shipping_label, order.shipping_cents === 0 ? 'Free' : formatMoney(order.shipping_cents)],
@@ -40,6 +40,13 @@ export function OrderCard({ order }: { order: OrderData }) {
   return (
     <section aria-label="Order confirmation" className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3.5">
       <h2 className="text-sm font-bold text-emerald-900">Order received</h2>
+      {number && (
+        <p className="mt-1 text-sm text-neutral-900" data-testid="order-number" role="status">
+          {number === 'pending' ? <span className="text-neutral-600">Getting your order number…</span>
+            : number === 'late' ? <span className="text-neutral-600">Your order number is still being assigned. The store has your order.</span>
+              : <>Order number <b className="font-mono">{number}</b> <span className="text-xs text-neutral-500">· keep it to follow up</span></>}
+        </p>
+      )}
       <p className="mt-1 text-sm font-semibold text-neutral-900">{order.brand ? `${order.brand} ` : ''}{order.product_name}</p>
       <p className="text-xs text-neutral-600">{order.size_cm} cm{order.colour ? ` · ${order.colour}` : ''}</p>
       <dl className="mt-2 text-sm">

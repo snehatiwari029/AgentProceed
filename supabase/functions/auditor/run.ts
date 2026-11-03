@@ -84,12 +84,15 @@ export async function runAuditor(raw: unknown, deps: AuditorDeps): Promise<Audit
   const summaryReturns = (proposal?.shown_returns_summary ?? (detail.agent_summary as Row | undefined)?.returns ?? null) as string | null
   const believed = ((action?.agent_believed_terms as Row | null | undefined)?.returns ?? null) as string | null
   const claimText = typeof summaryReturns === 'string' && summaryReturns ? summaryReturns : believed
-  const semantic = grant?.return_policy_required === true && product?.formal_terms_text && typeof claimText === 'string' && claimText
-    ? await deps.reader.readReturns({ agent_summary_returns: claimText, agent_believed_terms: believed, formal_returns: product.formal_returns, formal_terms_text: product.formal_terms_text })
-    : null
   const deliveryPhrase = typeof proposal?.shown_delivery === 'string' ? (proposal.shown_delivery as string) : null
   const todayDate = deps.today ? deps.today() : deps.now().toISOString().slice(0, 10)
-  const semantic_delivery = deliveryPhrase ? await deps.reader.readDelivery(deliveryPhrase, todayDate) : null
+  // The two reads are independent (different fields, different prompts), so they run at the same time.
+  const [semantic, semantic_delivery] = await Promise.all([
+    grant?.return_policy_required === true && product?.formal_terms_text && typeof claimText === 'string' && claimText
+      ? deps.reader.readReturns({ agent_summary_returns: claimText, agent_believed_terms: believed, formal_returns: product.formal_returns, formal_terms_text: product.formal_terms_text })
+      : Promise.resolve(null),
+    deliveryPhrase ? deps.reader.readDelivery(deliveryPhrase, todayDate) : Promise.resolve(null),
+  ])
 
   const result = audit(auditInputFromRecords({
     session_opened: sessionOpened, grant, proposal, action,
