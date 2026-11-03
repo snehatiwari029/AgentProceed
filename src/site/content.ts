@@ -63,10 +63,17 @@ export const content = {
     ] as { merchant: string; outcome: string; tone: 'good' | 'bad' }[],
   },
 
+  // Right after the hero: four one-line problems, each tagged with the feature that solves it (links to its entry below).
   problem: {
     eyebrow: 'The problem',
-    headline: 'You see the order, not the authorization.',
-    body: "A customer tells an agent to buy product on their behalf. The agent orders, you see only the order and payment authorization — not what the customer asked the agent to order and conditions associated, there's no proof that the agent did what it was asked to do. If agent does something customer didnt specify or misleads, you get a chargeback. it's he-said-she-said, and you lose.",
+    headline: 'AI agents are the new shoppers. Merchants are flying blind.',
+    intro: 'Payment networks and banks solved trust for shoppers. Merchants are still left without tools.',
+    blocks: [
+      { problem: 'Listings agents cannot read.', tag: 'Solved by Agent Optimize', to: '#feature-listing-optimizer' },
+      { problem: 'Orders merchants cannot verify.', tag: 'Solved by Agent Receipt', to: '#feature-agent-receipt' },
+      { problem: 'Disputes with no playbook.', tag: 'Solved by Agent Dispute', to: '#feature-evidence-packet' },
+      { problem: 'No view of what agents are doing in their store.', tag: 'Solved by Agent Activity', to: '#feature-agent-activity' },
+    ],
   },
 
   whatWeDo: {
@@ -75,31 +82,35 @@ export const content = {
     cards: [
       {
         icon: 'shield',
+        anchor: 'feature-agent-receipt',
         tag: 'Agent Receipt',
         title: 'Catch it before you ship',
         body: "Agent orders are checked at order received, before fulfillment. If the order doesn't match what the customer authorized — budget, returns, delivery, size — it's flagged Review Required or Hold for Suspicion, and you hold shipment until you review it.",
       },
       {
         icon: 'package',
+        anchor: 'feature-listing-optimizer',
         tag: 'Listing Optimizer + Read as Agent',
         title: 'Improve it',
         body: 'The agent audits your listings and suggests ways to structure listing for agents shopping on customer behalf to be able to read and interpret correctly.',
       },
       {
         icon: 'fingerprint',
+        anchor: 'feature-evidence-packet',
         tag: 'Evidence Packet',
         title: 'Prove it if it disputes anyway',
         body: 'Every order gets an immutable record of intent and auth, hash-sealed, that you can download in one click as a chargeback representation package. Show grant vs action vs receipt, represent with proof, or concede early and save the chargeback fee.',
       },
       {
         icon: 'bot',
+        anchor: 'feature-agent-activity',
         tag: 'Agent Activity tracker',
         title: 'See every agent in your store.',
         body: 'The Agent Activity map shows every agent session at its pipeline stage: session opened, grant recorded, proposal presented, order placed or verdict issued. Each bot icon is a real session record, with a verdict badge for its receipt. Icons move only when a stored record changes, and the map refreshes every 20 seconds.',
         image: { src: '/features/agent-activity-map.jpg', alt: 'The Agent Activity map in the merchant dashboard: a stylized store with seven agent sessions at the checkout line, each with a verdict badge, labelled as simulated agent traffic for Northwind Outfitters.' },
         cta: { label: 'See it in the dashboard', to: '/dashboard' },
       },
-    ] as { icon: string; tag: string; title: string; body: string; image?: { src: string; alt: string }; cta?: { label: string; to: string } }[],
+    ] as { icon: string; anchor: string; tag: string; title: string; body: string; image?: { src: string; alt: string }; cta?: { label: string; to: string } }[],
   },
 
   steps: {

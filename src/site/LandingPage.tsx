@@ -99,13 +99,18 @@ export default function LandingPage() {
         </section>
 
         <section className="gap" aria-labelledby="problem-h">
-          <div className="wrap gap-grid">
-            <div>
-              <p className="eyebrow">{c.problem.eyebrow}</p>
-              <h2 id="problem-h">{c.problem.headline}</h2>
-              <p className="gap-body">{c.problem.body}</p>
-            </div>
-            <Receipt />
+          <div className="wrap">
+            <p className="eyebrow">{c.problem.eyebrow}</p>
+            <h2 id="problem-h">{c.problem.headline}</h2>
+            <p className="gap-intro">{c.problem.intro}</p>
+            <ul className="problem-grid" aria-label="Problems">
+              {c.problem.blocks.map((b) => (
+                <li className="problem-card" key={b.problem}>
+                  <p className="problem-line">{b.problem}</p>
+                  <a className="solved-tag" href={b.to}>{b.tag} <Arrow down /></a>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -115,7 +120,7 @@ export default function LandingPage() {
             <h2 id="partner-h">{c.whatWeDo.headline}</h2>
             <div className="cols">
               {c.whatWeDo.cards.map((col) => (
-                <div className={`col${col.image ? ' col-visual' : ''}`} key={col.tag} data-testid={`feature-${col.icon}`}>
+                <div className={`col${col.image ? ' col-visual' : ''}`} key={col.tag} id={col.anchor} data-testid={`feature-${col.icon}`}>
                   <div className="col-text">
                     <span className="disc" aria-hidden="true">{iconFor(col.icon)}</span>
                     <p className="col-tag">{col.tag}</p>
@@ -150,6 +155,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="step-note">{c.steps.note}</p>
+              <Receipt />
             </div>
           </div>
         </section>
