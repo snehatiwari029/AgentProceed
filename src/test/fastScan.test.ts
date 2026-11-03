@@ -17,11 +17,15 @@ const countingAgent = (calls: string[]): AgentReader => {
   return { read: (input) => { calls.push(input.listing.title); return inner.read(input) } }
 }
 // The real store adds these two; the test world keeps them in memory.
+// jsonb hands objects back with their keys reordered (by length, then alphabetically): do the same here.
+const jsonb = (v: unknown): unknown => Array.isArray(v) ? v.map(jsonb)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort((a, b) => a.length - b.length || (a < b ? -1 : 1)).map((k) => [k, jsonb((v as Record<string, unknown>)[k])]))
+    : v
 function withScanStore(w: ReturnType<typeof world>) {
   w.deps.db.latestScan = async (m) => {
     const rows = w.tables.optimizer_scans.filter((s) => s.merchant_id === m)
     const s = rows[rows.length - 1]
-    return s ? { id: s.id as string, results: s.results } : null
+    return s ? { id: s.id as string, results: jsonb(JSON.parse(JSON.stringify(s.results))) } : null
   }
   w.deps.db.updateScanResults = async (m, id, results) => {
     const s = w.tables.optimizer_scans.find((x) => x.id === id && x.merchant_id === m)!

@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRows } from '../data'
 import { Card, Empty, Live, PageTitle } from '../components/Panel'
-import { CATEGORY_LABELS, PILLAR_NAMES, type Category, type Pillar, type PillarResult } from '../../../supabase/functions/optimizer/checks'
-import { RESULT_LABEL, type ReadResult, type ReadTest } from '../../../supabase/functions/optimizer/readtest'
-import { callOptimizer, filledIn, rankSuggestions, STATUS_LABEL, type Scan, type ScanListing, type Suggestion } from '../optimizer'
+import { CATEGORY_LABELS, PILLAR_NAMES, type Category, type Pillar } from '../../../supabase/functions/optimizer/checks'
+import { callOptimizer, rankSuggestions, STATUS_LABEL, type Scan, type Suggestion } from '../optimizer'
 
 // The dashboard is Northwind's (demo sign-in). Everything below is filtered to this merchant.
 const MERCHANT_NAME = 'Northwind Outfitters'
@@ -13,24 +12,13 @@ const MERCHANT_NAME = 'Northwind Outfitters'
 // and a "caused a real order mismatch" filter) was removed on 2026-10-29: a weak listing may simply be skipped by an
 // agent rather than cause a dispute, and the counts conflated problem instances with orders. Do not reintroduce it.
 
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`
-
-// Colour is never the only signal: every chip and card also says what it means in words.
-const RESULT_STYLE: Record<PillarResult, { text: string; cls: string }> = {
-  contradiction: { text: 'Contradiction', cls: 'border-dash-violation text-dash-violation' },
-  missing: { text: 'Missing', cls: 'border-dash-attention text-dash-attention' },
-  pass: { text: 'Pass', cls: 'border-dash-teal text-dash-teal' },
-  not_checked: { text: 'Not checked', cls: 'border-dash-edge text-dash-label' },
-}
+// Colour is never the only signal: every card also says what it means in words.
 const SEVERITY: Record<string, { label: string; border: string; text: string }> = {
   violation: { label: 'Fix first', border: 'border-dash-violation', text: 'text-dash-violation' },
   attention: { label: 'Blocks agent parsing', border: 'border-dash-attention', text: 'text-dash-attention' },
   lower: { label: 'Lower impact', border: 'border-dash-edge', text: 'text-dash-label' },
 }
 
-type Filters = { pillar: 'all' | Pillar; type: 'all' | 'contradiction' | 'missing' }
-const matches = (s: Suggestion, f: Filters) =>
-  (f.pillar === 'all' || s.pillar === f.pillar) && (f.type === 'all' || s.flag_type === f.type)
 
 export default function Optimization() {
   const [reload, setReload] = useState(0)
@@ -42,7 +30,7 @@ export default function Optimization() {
     <div className="flex flex-col gap-6">
       <PageTitle title="Listing Optimizer">
         What an agent shopping for a customer cannot find, parse or compare in your listings, and the fix for each.
-        You approve every fix; nothing here edits a listing, price, term or page.
+        Nothing here edits a listing, price, term or page.
       </PageTitle>
       <Live state={merchants}>
         {(rows) => {
@@ -70,15 +58,27 @@ export default function Optimization() {
   )
 }
 
+// What this browser did with the Read as Agent alerts of one scan. A new scan starts fresh.
+type ReadView = { scanId: string; cleared: boolean; done: boolean }
+const VIEW_KEY = 'agentproceed.readAsAgent.v1'
+function loadView(): ReadView | null {
+  try { const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null'); return v && typeof v.scanId === 'string' ? v : null } catch { return null }
+}
+function saveView(v: ReadView) {
+  try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)) } catch { /* the page still works for this visit */ }
+}
+
+const btn = 'rounded-md border px-3 py-1.5 text-sm font-semibold hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50'
+
 function Workspace({ merchant, scan, suggestions, onChanged }: {
   merchant: { id: string; name: string }
   scan: Scan | null
   suggestions: Suggestion[]
   onChanged: () => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
-  const [filters, setFilters] = useState<Filters>({ pillar: 'all', type: 'all' })
+  const [view, setView] = useState<ReadView | null>(loadView)
+  const update = (v: ReadView) => { saveView(v); setView(v) }
   // Blind read-tests finish after the scan replies. While any is still running on a recent scan, re-read the page data.
   const refresh = useRef(onChanged)
   refresh.current = onChanged
@@ -93,85 +93,25 @@ function Workspace({ merchant, scan, suggestions, onChanged }: {
     const listed = new Set(scan?.results.map((r) => r.product_id) ?? [])
     return suggestions.filter((s) => listed.has(s.product_id))
   }, [scan, suggestions])
-  const shown = current.filter((s) => matches(s, filters))
-  const pendingShown = shown.filter((s) => s.status === 'pending')
-  // Approve All approves only what it can: a suggestion with an empty To-be-filled field stays pending.
-  const approvable = pendingShown.filter(filledIn)
-  const needValue = pendingShown.length - approvable.length
-
-  async function scanNow() {
-    setBusy('scan')
-    setMessage(null)
-    const r = await callOptimizer({ action: 'scan', merchant_id: merchant.id })
-    setBusy(null)
-    if (r.type === 'scan') {
-      setMessage({ ok: true, text: `Scan finished: ${r.listings_scanned} listings, ${r.flags} flags. Resolved on re-scan: ${r.resolved}. Still flagged after approval: ${r.still_flagged}.` })
-      onChanged()
-    } else setMessage({ ok: false, text: r.type === 'error' ? r.message : 'Unexpected answer.' })
-  }
-
-  async function approveAll() {
-    setBusy('all')
-    setMessage(null)
-    const r = await callOptimizer({ action: 'approve_all', merchant_id: merchant.id, suggestion_ids: approvable.map((s) => s.id) })
-    setBusy(null)
-    if (r.type === 'approve_all') {
-      setMessage({ ok: true, text: `Approved ${r.approved}. ${r.skipped_unfilled} left pending because a To-be-filled field is empty. Nothing in your store was changed.` })
-      onChanged()
-    } else setMessage({ ok: false, text: r.type === 'error' ? r.message : 'Unexpected answer.' })
-  }
 
   return (
     <>
       <Card label="Optimizer header">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-lg font-bold text-dash-ink">{merchant.name}</p>
-            <Link to="/shop" className="text-sm font-semibold text-dash-teal hover:underline">View Store</Link>
-          </div>
-          <div className="flex flex-wrap items-start gap-3">
-            <button
-              type="button" onClick={scanNow} disabled={busy !== null}
-              aria-label={busy === 'scan' ? 'Scanning…' : 'Read as Agent Scan'}
-              className="flex flex-col items-center rounded-md border border-dash-teal px-4 py-1.5 leading-tight hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="text-xs font-semibold text-dash-lavender">Read as Agent</span>
-              <span className="text-sm font-bold text-dash-teal">{busy === 'scan' ? 'Scanning…' : 'Scan'}</span>
-            </button>
-            <div className="max-w-xs">
-              <button
-                type="button" onClick={approveAll} disabled={busy !== null || approvable.length === 0}
-                className="rounded-md border border-dash-edge px-4 py-2 text-sm font-semibold text-dash-ink hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy === 'all' ? 'Approving…' : `Approve All (${approvable.length})`}
-              </button>
-              <p className="mt-1 text-xs text-dash-label">
-                Approves the pending suggestions shown below. It does not apply them: no listing, price, term or page
-                changes. You apply each fix in your store, then Read as Agent Scan verifies it. Suggestions with an empty
-                To-be-filled field stay pending.
-              </p>
-              {needValue > 0 && (
-                <p className="mt-1 text-xs text-dash-attention" data-testid="approve-all-skipped">
-                  {needValue} more pending suggestion{needValue > 1 ? 's' : ''} shown need{needValue > 1 ? '' : 's'} a To-be-filled value first and will stay pending.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <p className="text-lg font-bold text-dash-ink">{merchant.name}</p>
+        <Link to="/shop" className="text-sm font-semibold text-dash-teal hover:underline">View Store</Link>
         {message && (
           <p role="status" className={`mt-3 text-sm ${message.ok ? 'text-dash-body' : 'text-dash-violation'}`}>{message.text}</p>
         )}
       </Card>
-
-      {!scan ? (
-        <Empty title="No scan yet.">Click Read as Agent Scan to scan your listings. Results come only from a scan of your live catalogue.</Empty>
-      ) : (
-        <>
-          <ScanSummary scan={scan} suggestions={current} />
-          <FilterBar filters={filters} onChange={setFilters} />
-          <ListingList scan={scan} suggestions={current} filters={filters} merchantId={merchant.id} onChanged={onChanged} />
-        </>
-      )}
+      {scan && <ScanSummary scan={scan} suggestions={current} />}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <FactorSection scan={scan} suggestions={current} merchantId={merchant.id} onChanged={onChanged} onMessage={setMessage} />
+        <ReadAsAgentSection
+          scan={scan} merchantId={merchant.id} view={view && scan && view.scanId === scan.id ? view : null}
+          onScanned={(id) => { update({ scanId: id, cleared: false, done: false }); onChanged() }}
+          onView={update} onMessage={setMessage}
+        />
+      </div>
     </>
   )
 }
@@ -221,169 +161,174 @@ function ScanSummary({ scan, suggestions }: { scan: Scan; suggestions: Suggestio
   )
 }
 
-function FilterBar({ filters, onChange }: { filters: Filters; onChange: (f: Filters) => void }) {
-  const sel = 'rounded-md border border-dash-edge bg-dash-card-raised px-2 py-1 text-sm text-dash-ink'
+function SectionHead({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label="Filters" className="flex flex-wrap items-center gap-4 text-sm">
-      <label className="flex items-center gap-2">
-        Pillar
-        <select className={sel} value={String(filters.pillar)} onChange={(e) => onChange({ ...filters, pillar: e.target.value === 'all' ? 'all' : (Number(e.target.value) as Pillar) })}>
-          <option value="all">All pillars</option>
-          {([1, 2, 3, 4, 5] as Pillar[]).map((p) => <option key={p} value={p}>{p}. {PILLAR_NAMES[p]}</option>)}
-        </select>
-      </label>
-      <label className="flex items-center gap-2">
-        Flag type
-        <select className={sel} value={filters.type} onChange={(e) => onChange({ ...filters, type: e.target.value as Filters['type'] })}>
-          <option value="all">All</option>
-          <option value="contradiction">Contradiction</option>
-          <option value="missing">Missing</option>
-        </select>
-      </label>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dash-edge pb-3">
+      <h2 className="text-lg font-bold text-dash-ink">{title}</h2>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   )
 }
 
-function ListingList({ scan, suggestions, filters, merchantId, onChanged }: {
-  scan: Scan; suggestions: Suggestion[]; filters: Filters; merchantId: string; onChanged: () => void
+// Left: the five-factor alerts (the optimizer's suggestions), grouped by factor.
+function FactorSection({ scan, suggestions, merchantId, onChanged, onMessage }: {
+  scan: Scan | null; suggestions: Suggestion[]; merchantId: string; onChanged: () => void
+  onMessage: (m: { ok: boolean; text: string } | null) => void
 }) {
-  const filtering = filters.pillar !== 'all' || filters.type !== 'all'
-  // The worked example opens by default: the first listing with a Contradiction.
-  const firstContradiction = scan.results.find((r) => r.pillars.some((p) => p.result === 'contradiction'))?.product_id ?? null
-  const [open, setOpen] = useState<Set<string>>(() => new Set(firstContradiction ? [firstContradiction] : []))
-  const listings = scan.results.filter((r) => !filtering || suggestions.some((s) => s.product_id === r.product_id && matches(s, filters)))
-  if (listings.length === 0) return <Empty title="No listings match these filters.">Change a filter to see more.</Empty>
+  const [busy, setBusy] = useState(false)
+  const [needs, setNeeds] = useState<Set<string>>(new Set())
+  const [showAll, setShowAll] = useState<Set<Pillar>>(new Set())
+  // What the merchant typed on each card: its To-be-filled values and its edited fix.
+  const edits = useRef<Record<string, { values: Record<string, string>; fix: string }>>({})
+  const names = useMemo(() => new Map(scan?.results.map((r) => [r.product_id, r.product_name]) ?? []), [scan])
+  const open = suggestions.filter((s) => s.status !== 'resolved' && s.status !== 'rejected')
+  const pending = open.filter((s) => s.status === 'pending')
+
+  async function markAllDone() {
+    setBusy(true)
+    onMessage(null)
+    const ready: Suggestion[] = []
+    const missing = new Set<string>()
+    for (const s of pending) {
+      const e = edits.current[s.id]
+      const values = { ...s.merchant_values, ...(e?.values ?? {}) }
+      if (s.value_fields.every((f) => (values[f] ?? '').trim() !== '')) ready.push(s)
+      else missing.add(s.id)
+    }
+    const replies = await Promise.all(ready.map((s) => callOptimizer({
+      action: 'decide', merchant_id: merchantId, suggestion_id: s.id, decision: 'approve',
+      fix_text: edits.current[s.id]?.fix ?? s.merchant_fix_text ?? s.suggested_fix, values: edits.current[s.id]?.values ?? {},
+    })))
+    setBusy(false)
+    setNeeds(missing)
+    const done = replies.filter((r) => r.type === 'decision').length
+    onMessage({ ok: done === ready.length, text: `Marked ${done} as done.${missing.size ? ` ${missing.size} need a value first (outlined in red).` : ''}` })
+    onChanged()
+  }
 
   return (
-    <ul className="flex flex-col gap-4" aria-label="Listings">
-      {listings.map((r) => {
-        const isOpen = open.has(r.product_id)
-        const mine = rankSuggestions(suggestions.filter((s) => s.product_id === r.product_id && (!filtering || matches(s, filters))))
-        const topPillar = r.pillars.find((p) => p.result === 'contradiction') ?? r.pillars.find((p) => p.result === 'missing')
-        return (
-          <li key={r.product_id} className="rounded-xl border border-dash-edge bg-dash-card p-5" data-testid="optimizer-listing">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-dash-ink">{r.product_name}</p>
-                <p className="mt-1 text-sm text-dash-body">
-                  {r.product_scope ?? 'scope missing'} · {r.size_cm !== null ? `${r.size_cm} cm` : 'size missing'} · {r.colour ?? 'colour missing'} · {money(r.price_cents)}
-                </p>
-                {topPillar && <p className="mt-1 text-sm text-dash-body">Pillar {topPillar.pillar}: {topPillar.summary}</p>}
-              </div>
-              <button
-                type="button" aria-expanded={isOpen}
-                onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(r.product_id)) n.delete(r.product_id); else n.add(r.product_id); return n })}
-                className="rounded-md border border-dash-edge px-3 py-1.5 text-sm font-semibold text-dash-ink hover:bg-dash-card-raised"
-              >
-                {isOpen ? 'Hide checklist' : 'Show checklist and fixes'}
-              </button>
+    <section aria-label="Listing optimization: 5 factors" data-tour="pillars" className="flex flex-col gap-4 rounded-xl border border-dash-edge bg-dash-card p-5">
+      <SectionHead title="Listing optimization: 5 factors">
+        <button type="button" onClick={markAllDone} disabled={busy || pending.length === 0} className={`${btn} border-dash-teal text-dash-teal`}>
+          {busy ? 'Marking…' : 'Mark all as done'}
+        </button>
+      </SectionHead>
+      {!scan ? (
+        <p className="text-sm text-dash-label">No scan yet. Press Read as Agent Scan.</p>
+      ) : (
+        ([1, 2, 3, 4, 5] as Pillar[]).map((p) => {
+          const mine = rankSuggestions(open.filter((s) => s.pillar === p))
+          // Open alerts first, then the ones marked as done.
+          const ordered = [...mine.filter((s) => s.status !== 'approved'), ...mine.filter((s) => s.status === 'approved')]
+          return (
+            <div key={p} data-testid={`factor-${p}`}>
+              <h3 className="font-semibold text-dash-ink">
+                {p}. {PILLAR_NAMES[p]} <span className="text-sm font-normal text-dash-label">({mine.filter((s) => s.status !== 'approved').length} open)</span>
+              </h3>
+              {ordered.length === 0 ? (
+                <p className="mt-1 text-sm text-dash-teal">No alerts.</p>
+              ) : (
+                <ul className="mt-2 flex flex-col gap-2">
+                  {(showAll.has(p) || needs.size > 0 ? ordered : ordered.slice(0, 3)).map((s) => (
+                    <SuggestionCard
+                      key={`${s.id}-${s.status}`} s={s} listing={names.get(s.product_id) ?? ''} needsValue={needs.has(s.id)}
+                      onEdit={(values, fix) => { edits.current[s.id] = { values, fix } }}
+                    />
+                  ))}
+                  {ordered.length > 3 && !(showAll.has(p) || needs.size > 0) && (
+                    <li>
+                      <button type="button" onClick={() => setShowAll((x) => new Set(x).add(p))} className="text-sm font-semibold text-dash-teal hover:underline">
+                        Show all {ordered.length}
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
             </div>
-            <ul className="mt-3 flex flex-wrap gap-2" aria-label={`Pillar summary for ${r.product_name}`}>
-              {r.pillars.map((p) => (
-                <li key={p.pillar} className={`rounded border px-2 py-0.5 text-xs font-bold ${RESULT_STYLE[p.result].cls}`}>
-                  P{p.pillar} {RESULT_STYLE[p.result].text}
+          )
+        })
+      )}
+    </section>
+  )
+}
+
+type ReadAlert = { key: string; listing: string; question: string; answer: string; quote: string | null; formal: string; line: string | null }
+
+// Right: what a blind shopping agent got wrong when it read each listing (the read-test mismatches).
+// Shown after this browser presses Read as Agent Scan; Clear all hides them until the next scan.
+function ReadAsAgentSection({ scan, merchantId, view, onScanned, onView, onMessage }: {
+  scan: Scan | null; merchantId: string; view: ReadView | null
+  onScanned: (scanId: string) => void; onView: (v: ReadView) => void
+  onMessage: (m: { ok: boolean; text: string } | null) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const tests = scan?.results.map((r) => ({ listing: r.product_name, id: r.product_id, t: r.read_test })) ?? []
+  const running = tests.filter((x) => x.t?.source === 'pending').length
+  const unavailable = tests.filter((x) => x.t?.source === 'unavailable').length
+  const alerts: ReadAlert[] = tests.flatMap((x) => x.t?.source !== 'muse-spark' ? [] : x.t.questions.filter((q) => q.result === 'mismatch').map((q) => ({
+    key: `${x.id}-${q.key}`, listing: x.listing, question: q.question, answer: q.agent_answer, quote: q.agent_quotes[0] ?? null, formal: q.formal_term, line: q.customer_line,
+  })))
+  const visible = !!view && !view.cleared
+
+  async function scanNow() {
+    setBusy(true)
+    onMessage(null)
+    const r = await callOptimizer({ action: 'scan', merchant_id: merchantId })
+    setBusy(false)
+    if (r.type === 'scan') {
+      onMessage({ ok: true, text: `Scan finished: ${r.listings_scanned} listings, ${r.flags} alerts.` })
+      onScanned(r.scan_id)
+    } else onMessage({ ok: false, text: r.type === 'error' ? r.message : 'Unexpected answer.' })
+  }
+
+  return (
+    <section aria-label="Read as Agent" data-testid="read-as-agent-section" className="flex flex-col gap-4 rounded-xl border border-dash-edge bg-dash-card p-5">
+      <SectionHead title="Read as Agent">
+        <button
+          type="button" onClick={scanNow} disabled={busy}
+          aria-label={busy ? 'Scanning…' : 'Read as Agent Scan'}
+          className="flex flex-col items-center rounded-md border border-dash-teal px-4 py-1.5 leading-tight hover:bg-dash-card-raised disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className="text-xs font-semibold text-dash-lavender">Read as Agent</span>
+          <span className="text-sm font-bold text-dash-teal">{busy ? 'Scanning…' : 'Scan'}</span>
+        </button>
+        <button
+          type="button" disabled={!visible || view!.done || alerts.length === 0}
+          onClick={() => onView({ ...view!, done: true })} className={`${btn} border-dash-edge text-dash-ink`}
+        >
+          Mark all as done
+        </button>
+        <button
+          type="button" disabled={!visible}
+          onClick={() => onView({ ...view!, cleared: true })} className={`${btn} border-dash-edge text-dash-ink`}
+        >
+          Clear all
+        </button>
+      </SectionHead>
+      {!visible ? (
+        <p className="text-sm text-dash-label" data-testid="read-as-agent-empty">
+          {view?.cleared ? 'Cleared. Press Read as Agent Scan to list the alerts again.' : 'Press Read as Agent Scan to see how a shopping agent reads your listings.'}
+        </p>
+      ) : (
+        <>
+          {running > 0 && <p className="text-sm text-dash-body" data-testid="read-test-pending">Agent is reading your listings… {tests.length - running} of {tests.length} done.</p>}
+          {unavailable > 0 && <p className="text-sm text-dash-attention" data-testid="read-test-unavailable">Agent read-test unavailable on {unavailable} of {tests.length} listings.</p>}
+          {alerts.length === 0 ? (
+            running === 0 && unavailable < tests.length && <p className="text-sm text-dash-teal" data-testid="read-test-all-match">No alerts: the agent's answers match your terms.</p>
+          ) : (
+            <ul className="flex flex-col gap-2" aria-label="Read as Agent alerts">
+              {alerts.map((a) => (
+                <li key={a.key} data-testid="read-alert" className={`rounded-lg border-l-4 bg-dash-card-raised p-3 ${view!.done ? 'border-dash-teal opacity-70' : 'border-dash-violation'}`}>
+                  <p className="flex flex-wrap justify-between gap-x-3 text-xs font-bold">
+                    <span className="text-dash-label">{a.listing}</span>
+                    {view!.done ? <span className="text-dash-teal">Done</span> : <span className="text-dash-violation">Mismatch</span>}
+                  </p>
+                  <p className="mt-1 font-semibold text-dash-ink">{a.question}</p>
+                  <p className="mt-1 text-sm"><span className="text-dash-label">Agent: </span>{a.answer}{a.quote && <span className="text-dash-label"> (“{a.quote}”)</span>}</p>
+                  <p className="text-sm"><span className="text-dash-label">Your terms: </span>{a.formal}</p>
                 </li>
               ))}
             </ul>
-            {isOpen && <ListingDetail listing={r} suggestions={mine} merchantId={merchantId} onChanged={onChanged} />}
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
-
-function ListingDetail({ listing, suggestions, merchantId, onChanged }: { listing: ScanListing; suggestions: Suggestion[]; merchantId: string; onChanged: () => void }) {
-  const d = listing.semantic.deconstructed
-  const parts = d ? Object.entries(d).filter(([, v]) => v !== null) : []
-  return (
-    <div className="mt-4 flex flex-col gap-4 border-t border-dash-edge pt-4">
-      <p className="text-xs text-dash-label">
-        Semantic reading: <span className={listing.semantic.source === 'muse-spark' ? 'text-dash-teal' : 'text-dash-attention'}>{listing.semantic.label}</span>. {listing.semantic.reason}
-        {parts.length > 0 && <> Spark read the copy as: {parts.map(([k, v]) => `${k} ${JSON.stringify(v)}`).join(', ')}.</>}
-      </p>
-      <table className="w-full text-left text-sm" data-tour="pillars">
-        <caption className="mb-2 text-left font-semibold text-dash-ink">Pillar 1–5 checklist</caption>
-        <thead className="text-xs text-dash-label">
-          <tr><th className="py-1 pr-3">Pillar</th><th className="py-1 pr-3">Result</th><th className="py-1">Evidence</th></tr>
-        </thead>
-        <tbody>
-          {listing.pillars.map((p) => (
-            <tr key={p.pillar} className="border-t border-dash-edge align-top">
-              <td className="py-2 pr-3 text-dash-ink">{p.pillar}. {p.name}</td>
-              <td className={`py-2 pr-3 font-bold ${RESULT_STYLE[p.result].cls.split(' ')[1]}`}>{RESULT_STYLE[p.result].text}</td>
-              <td className="py-2">
-                <ul className="flex flex-col gap-1">
-                  {suggestions.filter((s) => s.pillar === p.pillar).map((s) => <li key={s.id}>{s.subtype}: {s.title}</li>)}
-                  {p.notes.map((n) => <li key={n} className="text-dash-label">{n}</li>)}
-                </ul>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {listing.read_test && <AgentReadTest test={listing.read_test} />}
-      <div>
-        <p className="font-semibold text-dash-ink">Suggested fixes, highest impact first</p>
-        <ul className="mt-2 flex flex-col gap-3">
-          {suggestions.map((s) => <SuggestionCard key={`${s.id}-${s.status}`} s={s} merchantId={merchantId} onChanged={onChanged} />)}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
-const READ_STYLE: Record<ReadResult, string> = { match: 'text-dash-teal', mismatch: 'text-dash-violation', not_stated: 'text-dash-label' }
-
-// Agent read-test: its own row group, apart from the pillar checklist and the fixes. It never adds a flag or a fix.
-// Agent answers come from a blind Spark read of the displayed listing; formal terms come from the catalogue; code decides
-// the result. The two are shown in separate columns so an agent answer is never read as part of the terms.
-function AgentReadTest({ test }: { test: ReadTest }) {
-  return (
-    <section aria-label="Read as Agent" data-testid="agent-read-test" className="rounded-lg border border-dash-edge p-3">
-      <p className="font-semibold text-dash-ink">Read as Agent</p>
-      <p className="mt-1 text-xs text-dash-label">
-        A shopping agent read this listing as shoppers see it, without your formal terms, and answered four fixed questions.
-        Code compared each answer with your formal terms. Nothing here changes your listing.
-      </p>
-      {test.source === 'pending' ? (
-        <p className="mt-2 text-sm text-dash-body" data-testid="read-test-pending">
-          {test.label}… {test.reason} If this stays for more than a few minutes, press Read as Agent Scan again.
-        </p>
-      ) : test.source !== 'muse-spark' ? (
-        <p className="mt-2 text-sm text-dash-attention" data-testid="read-test-unavailable">{test.label}. {test.reason}</p>
-      ) : (
-        <>
-          <table className="mt-2 w-full text-left text-sm">
-            <thead className="text-xs text-dash-label">
-              <tr><th className="py-1 pr-3">Question</th><th className="py-1 pr-3">Agent answer</th><th className="py-1 pr-3">Formal term</th><th className="py-1">Result (code)</th></tr>
-            </thead>
-            <tbody>
-              {test.questions.map((x) => (
-                <tr key={x.key} className="border-t border-dash-edge align-top" data-testid={`read-test-${x.key}`}>
-                  <td className="py-2 pr-3 text-dash-ink">{x.question}</td>
-                  <td className="py-2 pr-3">
-                    <p className="text-dash-ink">{x.agent_answer}</p>
-                    {x.agent_quotes.map((qt) => <p key={qt} className="text-xs text-dash-label">Quote: "{qt}"</p>)}
-                    {x.agent_detail && <p className="text-xs text-dash-label">{x.agent_detail}</p>}
-                  </td>
-                  <td className="py-2 pr-3 text-dash-body">{x.formal_term}</td>
-                  <td className="py-2">
-                    <p className={`font-bold ${READ_STYLE[x.result]}`}>{RESULT_LABEL[x.result]}</p>
-                    <p className="text-xs text-dash-label">{x.code_note}</p>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <ul className="mt-2 flex flex-col gap-1 text-sm">
-            {test.questions.filter((x) => x.customer_line).map((x) => (
-              <li key={x.key} className="text-dash-violation" data-testid="read-test-customer-line">{x.customer_line}</li>
-            ))}
-            {test.summary && <li className="text-dash-teal" data-testid="read-test-all-match">{test.summary}</li>}
-          </ul>
-          {test.dropped.length > 0 && (
-            <p className="mt-2 text-xs text-dash-label">Removed by the quote check (not in the displayed listing): {test.dropped.join('; ')}.</p>
           )}
         </>
       )}
@@ -391,48 +336,42 @@ function AgentReadTest({ test }: { test: ReadTest }) {
   )
 }
 
-function SuggestionCard({ s, merchantId, onChanged }: { s: Suggestion; merchantId: string; onChanged: () => void }) {
+function SuggestionCard({ s, listing, needsValue, onEdit }: {
+  s: Suggestion; listing: string; needsValue: boolean; onEdit: (values: Record<string, string>, fix: string) => void
+}) {
   const editable = s.status === 'pending' || s.status === 'rejected'
   const [fix, setFix] = useState(s.merchant_fix_text ?? s.suggested_fix)
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(s.value_fields.map((f) => [f, s.merchant_values?.[f] ?? ''])))
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [tried, setTried] = useState(false) // Approve was clicked with a required field empty
+  const [openCard, setOpenCard] = useState(false)
   const inputs = useRef<Record<string, HTMLInputElement | null>>({})
   const sev = SEVERITY[s.severity] ?? SEVERITY.lower
   const unfilled = s.value_fields.filter((f) => !values[f]?.trim())
-
-  async function act(decision: 'approve' | 'reject') {
-    if (decision === 'approve' && unfilled.length > 0) {
-      // Nothing is sent: show which fields are missing, and put the cursor in the first one.
-      setTried(true)
-      setError(`Fill ${unfilled.join(', ')} before approving. The optimizer never fills a missing value.`)
-      inputs.current[unfilled[0]]?.focus()
-      return
-    }
-    setBusy(true)
-    setError(null)
-    const r = await callOptimizer({ action: 'decide', merchant_id: merchantId, suggestion_id: s.id, decision, fix_text: fix, values })
-    setBusy(false)
-    if (r.type === 'decision') onChanged()
-    else setError(r.type === 'error' ? r.message : 'Unexpected answer.')
-  }
+  const tried = needsValue && editable
+  const expanded = openCard || tried
+  const done = s.status === 'approved'
+  useEffect(() => { onEdit(values, fix) }, [values, fix]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <li className={`rounded-lg border-l-4 ${sev.border} bg-dash-card-raised p-4`} data-testid="optimizer-suggestion">
-      <p className="flex flex-wrap gap-x-3 text-xs font-bold">
-        <span className={sev.text}>{CATEGORY_LABELS[s.category as Category]} · {sev.label}</span>
-        <span className="text-dash-label">Pillar {s.pillar} · {s.subtype}</span>
-        {s.source !== 'deterministic' && <span className="text-dash-label">{s.source}</span>}
+    <li className={`rounded-lg border-l-4 ${done ? 'border-dash-teal opacity-70' : sev.border} bg-dash-card-raised px-3 py-2`} data-testid="optimizer-suggestion">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-dash-ink">{s.title}</p>
+        <button type="button" aria-expanded={expanded} onClick={() => setOpenCard((o) => !o)} className="shrink-0 text-xs font-semibold text-dash-teal hover:underline">
+          {expanded ? 'Hide details' : 'Details'}
+        </button>
+      </div>
+      <p className="mt-0.5 text-xs">
+        <span className="text-dash-label">{listing}</span>
+        {' · '}
+        {done ? <span className="font-bold text-dash-teal">Done</span> : <span className={`font-bold ${sev.text}`}>{sev.label}</span>}
       </p>
-      <p className="mt-1 font-semibold text-dash-ink">{s.title}</p>
+      {expanded && <>
       <ul className="mt-2 list-disc pl-5 text-sm">
         {s.evidence.map((e) => <li key={e} className="break-words">{e}</li>)}
       </ul>
       <p className="mt-2 text-sm"><span className="text-dash-label">Impact: </span>{s.impact}</p>
       {editable ? (
         <label className="mt-3 block text-sm">
-          <span className="text-dash-label">Suggested fix (you can edit it before approving)</span>
+          <span className="text-dash-label">Suggested fix</span>
           <textarea
             value={fix} onChange={(e) => setFix(e.target.value)} rows={Math.min(14, fix.split('\n').length + 1)}
             className="mt-1 w-full rounded-md border border-dash-edge bg-dash-card p-2 font-mono text-xs text-dash-ink"
@@ -445,7 +384,7 @@ function SuggestionCard({ s, merchantId, onChanged }: { s: Suggestion; merchantI
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {s.value_fields.map((f) => (
             <label key={f} className="text-sm">
-              <span className="text-dash-label">To be filled by merchant: {f}{editable && <span className="text-dash-attention"> (required to approve)</span>}</span>
+              <span className="text-dash-label">To be filled by merchant: {f}</span>
               <input
                 ref={(el) => { inputs.current[f] = el }}
                 value={values[f] ?? ''} disabled={!editable} placeholder="Empty — type your value"
@@ -455,7 +394,7 @@ function SuggestionCard({ s, merchantId, onChanged }: { s: Suggestion; merchantI
                   tried && unfilled.includes(f) ? 'border-2 border-dash-violation' : 'border-dash-edge'
                 }`}
               />
-              {tried && unfilled.includes(f) && <span className="mt-1 block text-xs text-dash-violation">Required before approving.</span>}
+              {tried && unfilled.includes(f) && <span className="mt-1 block text-xs text-dash-violation">Required.</span>}
             </label>
           ))}
         </div>
@@ -469,26 +408,7 @@ function SuggestionCard({ s, merchantId, onChanged }: { s: Suggestion; merchantI
       {s.rescan_result && s.rescan_at && (!s.decided_at || Date.parse(s.rescan_at) >= Date.parse(s.decided_at)) && (
         <p className="mt-1 text-sm text-dash-body">Re-scan ({new Date(s.rescan_at).toLocaleString()}): {s.rescan_result}</p>
       )}
-      {error && <p role="alert" className="mt-2 text-sm text-dash-violation">{error}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {editable && (
-          <button
-            type="button" onClick={() => act('approve')} disabled={busy}
-            className="rounded-md border border-dash-teal px-3 py-1.5 text-sm font-semibold text-dash-teal hover:bg-dash-card disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Approve
-          </button>
-        )}
-        {(s.status === 'pending' || s.status === 'approved' || s.status === 'still_flagged') && (
-          <button
-            type="button" onClick={() => act('reject')} disabled={busy}
-            className="rounded-md border border-dash-edge px-3 py-1.5 text-sm font-semibold text-dash-body hover:bg-dash-card disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Reject
-          </button>
-        )}
-        {editable && <span className="text-xs text-dash-label">Approving records your decision. It does not change your listing.</span>}
-      </div>
+      </>}
     </li>
   )
 }

@@ -11,6 +11,7 @@ vi.mock('../shared/supabase', () => ({ supabase: fakeClient }))
 
 import AppRoutes from '../app/AppRoutes'
 import { runScan } from '../../supabase/functions/optimizer/run'
+import { PILLAR_NAMES } from '../../supabase/functions/optimizer/checks'
 import { BURTON, NW, scriptedAgent, world } from './optimizerFixtures'
 import type { Receipt } from '../shared/schemas'
 
@@ -543,8 +544,12 @@ describe('Optimization for Agents', () => {
     return w
   }
   let calls: { url: string; body: Record<string, unknown> }[] = []
+  let scanReplyId = 's'
+  const VIEW_KEY = 'agentproceed.readAsAgent.v1'
   beforeEach(() => {
     calls = []
+    scanReplyId = 's'
+    localStorage.clear()
     vi.stubEnv('VITE_SUPABASE_URL', 'https://project.test')
     vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test')
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
@@ -552,7 +557,7 @@ describe('Optimization for Agents', () => {
       calls.push({ url, body })
       const reply = body.action === 'approve_all' ? { type: 'approve_all', approved: 1, skipped_unfilled: 2, skipped_not_pending: 0 }
         : body.action === 'decide' ? { type: 'decision', suggestion_id: body.suggestion_id, status: 'approved' }
-          : { type: 'scan', scan_id: 's', listings_scanned: 9, flags: 1, resolved: 0, still_flagged: 0, markup_status: 'fetched', spark: {} }
+          : { type: 'scan', scan_id: scanReplyId, listings_scanned: 9, flags: 1, resolved: 0, still_flagged: 0, markup_status: 'fetched', spark: {} }
       return new Response(JSON.stringify(reply))
     }))
   })
@@ -561,13 +566,32 @@ describe('Optimization for Agents', () => {
     vi.unstubAllGlobals()
   })
 
-  it('before any scan shows Read as Agent Scan and an empty state, not seeded checklist text', async () => {
+  const left = () => screen.getByRole('region', { name: 'Listing optimization: 5 factors' })
+  const right = () => screen.getByRole('region', { name: 'Read as Agent' })
+  // Each factor shows 3 alerts until "Show all N" is pressed.
+  async function showAll(user: ReturnType<typeof userEvent.setup>) {
+    for (const b of within(left()).queryAllByRole('button', { name: /^Show all \d+$/ })) await user.click(b)
+  }
+
+  it('before any scan: two sections, the scan button on the Read as Agent side, and nothing listed', async () => {
     mock.tables = { merchants: NORTHWIND }
     open('/dashboard/optimization')
     expect(await screen.findByRole('heading', { name: 'Listing Optimizer' })).toBeInTheDocument()
-    expect(await screen.findByText('No scan yet.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Read as Agent Scan' })).toBeInTheDocument()
-    expect(screen.queryByTestId('optimizer-listing')).not.toBeInTheDocument()
+    await screen.findByRole('region', { name: 'Read as Agent' })
+    expect(within(left()).getByText(/No scan yet/)).toBeInTheDocument()
+    expect(within(right()).getByTestId('read-as-agent-empty')).toHaveTextContent('Press Read as Agent Scan')
+    expect(within(right()).getByRole('button', { name: 'Read as Agent Scan' })).toBeInTheDocument()
+    expect(screen.queryByTestId('optimizer-suggestion')).not.toBeInTheDocument()
+  })
+
+  it('buttons: one "Mark all as done" over the 5 factors; Scan, Mark all as done and Clear all over Read as Agent; no Approve or Reject', async () => {
+    await scanned()
+    open('/dashboard/optimization')
+    await screen.findAllByTestId('optimizer-suggestion')
+    expect(within(left()).getAllByRole('button').filter((b) => !/Details|Hide details|^Show all \d+$/.test(b.textContent ?? '')).map((b) => b.textContent)).toEqual(['Mark all as done'])
+    expect(within(right()).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Read as Agent Scan', 'Mark all as done', 'Clear all'])
+    expect(screen.queryByRole('button', { name: /^Approve|^Reject/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/It does not apply them/)).not.toBeInTheDocument() // no button explanations
   })
 
   it('Read as Agent Scan calls the optimizer function with this merchant only', async () => {
@@ -579,24 +603,34 @@ describe('Optimization for Agents', () => {
     expect(await screen.findByText(/Scan finished: 9 listings/)).toBeInTheDocument()
   })
 
-  it('shows the scan: header, summary, 9 listing rows, and the Spellbinder worked example open', async () => {
-    await scanned()
+  it('the 5-factor section lists every open alert under its own factor, with the listing it is for', async () => {
+    const user = userEvent.setup()
+    const w = await scanned()
     open('/dashboard/optimization')
-    expect(await screen.findAllByTestId('optimizer-listing')).toHaveLength(9)
+    await screen.findAllByTestId('optimizer-suggestion')
+    const p1 = w.tables.optimizer_suggestions.filter((s) => s.pillar === 1).length
+    expect(within(within(left()).getByTestId('factor-1')).getAllByTestId('optimizer-suggestion')).toHaveLength(3) // 3 until Show all
+    expect(within(within(left()).getByTestId('factor-1')).getByRole('button', { name: `Show all ${p1}` })).toBeInTheDocument()
+    await showAll(user)
     const header = screen.getByRole('region', { name: 'Optimizer header' })
     expect(header).toHaveTextContent('Northwind Outfitters')
     expect(within(header).getByRole('link', { name: 'View Store' })).toHaveAttribute('href', '/shop')
     expect(screen.getByText('Listings scanned').nextSibling).toHaveTextContent('9')
-    expect(screen.getByText('Top priority').nextSibling).toHaveTextContent(/^Contradictions first$/)
-    expect(screen.getAllByText('Pillar 2: Contradiction — Marketing "Easy returns." vs formal terms "Final Sale"')).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'Hide checklist' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'Show checklist and fixes' })).toHaveLength(8)
+    for (const p of [1, 2, 3, 4, 5] as const) {
+      const group = within(left()).getByTestId(`factor-${p}`)
+      expect(within(group).getByRole('heading', { level: 3 })).toHaveTextContent(new RegExp(`^${p}\\. ${PILLAR_NAMES[p].replace(/[()]/g, '\\$&')}`))
+      expect(within(group).queryAllByTestId('optimizer-suggestion')).toHaveLength(w.tables.optimizer_suggestions.filter((s) => s.pillar === p).length)
+    }
+    const returns = within(within(left()).getByTestId('factor-2')).getAllByTestId('optimizer-suggestion')[0]
+    expect(returns).toHaveTextContent('Burton Spellbinder')
+    expect(returns).toHaveTextContent('Marketing "Easy returns." vs formal terms "Final Sale"')
+    expect(within(right()).queryByTestId('optimizer-suggestion')).not.toBeInTheDocument()
   })
 
   it('the scan summary names the same deconstruction source as the listings, and explains rules-fallback only when a listing used it', async () => {
     const w = await scanned()
     open('/dashboard/optimization')
-    await screen.findAllByTestId('optimizer-listing')
+    await screen.findAllByTestId('optimizer-suggestion')
     const spark = (w.tables.optimizer_scans[0] as { spark: Record<string, number> }).spark
     const line = screen.getByText(/^Semantic reading \(pillar deconstruction\):/)
     const onSpark = spark['muse-spark'] ?? 0
@@ -604,155 +638,139 @@ describe('Optimization for Agents', () => {
     expect(line).toHaveTextContent(`Muse Spark deconstruction on ${onSpark} of 9`)
     if (onFallback > 0) expect(line).toHaveTextContent(`rules-fallback — deterministic check only, Spark deconstruction unavailable on ${onFallback} of 9`)
     else expect(line).not.toHaveTextContent(/rules-fallback/)
-    expect(line).not.toHaveTextContent(/muse-spark on/)
   })
 
   it('shows no Order check linkage: no order numbers, mismatch counts, "linked to" tags or caused-mismatch filter', async () => {
     const user = userEvent.setup()
-    await scanned({ agent: scriptedAgent() }) // with Agent read-test answers on the page too
+    const w = await scanned({ agent: scriptedAgent() })
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ scanId: w.tables.optimizer_scans[0].id, cleared: false, done: false }))
     open('/dashboard/optimization')
-    await screen.findAllByTestId('optimizer-listing')
-    for (const b of screen.getAllByRole('button', { name: 'Show checklist and fixes' })) await user.click(b) // open every listing
-    expect(await screen.findAllByRole('button', { name: 'Hide checklist' })).toHaveLength(9)
-    const text = screen.getByRole('main').textContent ?? '' // the page itself; the sidebar nav still links to Disputes
+    await screen.findAllByTestId('optimizer-suggestion')
+    for (const b of screen.getAllByRole('button', { name: 'Details' })) await user.click(b)
+    const text = screen.getByRole('main').textContent ?? ''
     for (const banned of ['12322', '13422', '14522', '15001', '15002', 'Budget mismatches', 'Returns mismatches', 'Open Agent orders']) expect(text).not.toContain(banned)
     expect(text).not.toMatch(/linked to|caused a real order mismatch|review required|chargeback|dispute/i)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
-  it('Approve All says it applies nothing, and sends only the pending suggestions shown', async () => {
+  it('5 factors "Mark all as done" marks every open alert whose values are filled; the rest stay open, outlined in red', async () => {
     const user = userEvent.setup()
     const w = await scanned()
     open('/dashboard/optimization')
-    await screen.findAllByTestId('optimizer-listing')
-    expect(screen.getByText(/It does not apply them: no listing, price, term or page\s+changes/)).toBeInTheDocument()
-    await user.selectOptions(screen.getByLabelText('Flag type'), 'contradiction')
-    await user.click(screen.getByRole('button', { name: /^Approve All/ }))
-    const sent = calls[0].body.suggestion_ids as string[]
-    expect(calls[0].body.action).toBe('approve_all')
-    expect(sent).toEqual([w.find(BURTON, 'p2.returns').id])
-    expect(await screen.findByText(/2 left pending because a To-be-filled field is empty. Nothing in your store was changed./)).toBeInTheDocument()
+    await screen.findAllByTestId('optimizer-suggestion')
+    const ready = w.tables.optimizer_suggestions.filter((s) => s.value_fields.length === 0)
+    const needing = w.tables.optimizer_suggestions.length - ready.length
+    await user.click(within(left()).getByRole('button', { name: 'Mark all as done' }))
+    expect(calls.every((c) => c.body.action === 'decide' && c.body.decision === 'approve')).toBe(true)
+    expect(new Set(calls.map((c) => c.body.suggestion_id))).toEqual(new Set(ready.map((s) => s.id)))
+    expect(await screen.findByText(`Marked ${ready.length} as done. ${needing} need a value first (outlined in red).`)).toBeInTheDocument()
+    const ids = within(left()).getAllByTestId('optimizer-suggestion').find((el) => el.textContent?.includes('Missing identifiers') && el.textContent.includes('Spellbinder'))!
+    const gtin = within(ids).getByLabelText(/^To be filled by merchant: GTIN/) // opened by itself
+    expect(gtin).toHaveAttribute('aria-invalid', 'true')
+    expect(gtin).toHaveClass('border-dash-violation')
   })
 
-  it('Approve with an empty To-be-filled field sends nothing and outlines each empty field in red', async () => {
+  it('values typed on an alert are sent with it by "Mark all as done"', async () => {
     const user = userEvent.setup()
     const w = await scanned()
     open('/dashboard/optimization')
-    const spell = (await screen.findAllByTestId('optimizer-listing'))[0]
-    const ids = within(spell).getAllByTestId('optimizer-suggestion').find((el) => el.textContent?.includes('Missing identifiers'))!
-    const field = (f: string) => within(ids).getByLabelText(new RegExp(`^To be filled by merchant: ${f}`))
-    expect(field('GTIN')).toHaveValue('')
-    expect(field('GTIN')).toHaveAccessibleName('To be filled by merchant: GTIN (required to approve)')
-    expect(field('GTIN')).not.toHaveAttribute('aria-invalid', 'true') // not red before the merchant tries
-
-    await user.type(field('MPN'), 'M1')
-    await user.click(within(ids).getByRole('button', { name: 'Approve' }))
-    expect(calls).toHaveLength(0) // nothing sent
-    expect(within(ids).getByRole('alert')).toHaveTextContent('Fill GTIN, SKU before approving. The optimizer never fills a missing value.')
-    for (const f of ['GTIN', 'SKU']) {
-      expect(field(f)).toHaveAttribute('aria-invalid', 'true')
-      expect(field(f)).toHaveClass('border-dash-violation')
-    }
-    expect(field('MPN')).not.toHaveClass('border-dash-violation')
-    expect(field('GTIN')).toHaveFocus()
-    expect(within(ids).getAllByText('Required before approving.')).toHaveLength(2)
-
-    await user.type(field('GTIN'), '0123')
-    expect(field('GTIN')).not.toHaveClass('border-dash-violation') // red clears as soon as it is filled
-    await user.type(field('SKU'), 'S1')
-    await user.click(within(ids).getByRole('button', { name: 'Approve' }))
-    expect(calls).toHaveLength(1)
-    expect(calls[0].body).toMatchObject({ action: 'decide', suggestion_id: w.find(BURTON, 'p1.identifiers').id, decision: 'approve', values: { GTIN: '0123', MPN: 'M1', SKU: 'S1' } })
+    await screen.findAllByTestId('optimizer-suggestion')
+    await showAll(user)
+    const ids = within(left()).getAllByTestId('optimizer-suggestion').find((el) => el.textContent?.includes('Missing identifiers') && el.textContent.includes('Spellbinder'))!
+    await user.click(within(ids).getByRole('button', { name: 'Details' }))
+    for (const [f, v] of [['GTIN', '0123'], ['MPN', 'M1'], ['SKU', 'S1']]) await user.type(within(ids).getByLabelText(new RegExp(`^To be filled by merchant: ${f}`)), v)
+    await user.click(within(left()).getByRole('button', { name: 'Mark all as done' }))
+    expect(calls.find((c) => c.body.suggestion_id === w.find(BURTON, 'p1.identifiers').id)?.body).toMatchObject({ action: 'decide', decision: 'approve', values: { GTIN: '0123', MPN: 'M1', SKU: 'S1' } })
   })
 
-  it('Approve All counts only what it will approve; suggestions needing a value are counted separately and not sent', async () => {
+  it('an alert marked as done shows Done and moves below the open ones; a re-scan note shows only when newer than the decision', async () => {
     const user = userEvent.setup()
     const w = await scanned()
-    open('/dashboard/optimization')
-    await screen.findAllByTestId('optimizer-listing')
-    const pending = w.tables.optimizer_suggestions
-    const ready = pending.filter((s) => s.value_fields.length === 0)
-    expect(screen.getByRole('button', { name: /^Approve All/ })).toHaveTextContent(`Approve All (${ready.length})`)
-    expect(screen.getByTestId('approve-all-skipped')).toHaveTextContent(`${pending.length - ready.length} more pending suggestions shown need a To-be-filled value first and will stay pending.`)
-
-    await user.selectOptions(screen.getByLabelText('Flag type'), 'missing') // the count follows the filter
-    const readyMissing = ready.filter((s) => s.flag_type === 'missing')
-    expect(screen.getByRole('button', { name: /^Approve All/ })).toHaveTextContent(`Approve All (${readyMissing.length})`)
-    await user.click(screen.getByRole('button', { name: /^Approve All/ }))
-    expect(new Set(calls[0].body.suggestion_ids as string[])).toEqual(new Set(readyMissing.map((s) => s.id)))
-  })
-
-  it('shows a re-scan note only when that re-scan ran after the latest decision, with its time', async () => {
-    const w = await scanned()
-    const returns = w.find(BURTON, 'p2.returns') // approved at 20:40, after the 20:35 re-scan: the note is stale
+    const returns = w.find(BURTON, 'p2.returns')
     Object.assign(returns, { status: 'approved', decided_by: 'Northwind Outfitters (demo merchant sign-in)', decided_at: '2026-10-29T03:40:46.951+00:00', rescan_result: 'Still present on re-scan.', rescan_at: '2026-10-29T03:35:53.16+00:00' })
-    const markup = w.find(BURTON, 'p3.markup') // approved, then re-scanned: the note is current
+    const markup = w.find(BURTON, 'p3.markup')
     Object.assign(markup, { status: 'still_flagged', decided_by: 'Northwind Outfitters (demo merchant sign-in)', decided_at: '2026-10-29T03:40:00+00:00', rescan_result: 'Still flagged on re-scan: the deterministic check still fails.', rescan_at: '2026-10-29T03:45:00+00:00' })
     open('/dashboard/optimization')
-    const cards = within((await screen.findAllByTestId('optimizer-listing'))[0]).getAllByTestId('optimizer-suggestion')
-    const card = (t: string) => cards.find((el) => el.textContent?.includes(t))!
-    expect(card('vs formal terms').textContent).not.toContain('Re-scan')
-    expect(card('No Schema.org Product').textContent).toContain(`Re-scan (${new Date('2026-10-29T03:45:00+00:00').toLocaleString()}): Still flagged on re-scan`)
+    await screen.findAllByTestId('optimizer-suggestion')
+    await showAll(user)
+    const f2 = within(within(left()).getByTestId('factor-2')).getAllByTestId('optimizer-suggestion')
+    const doneCard = f2.find((el) => el.textContent?.includes('vs formal terms'))!
+    expect(f2[f2.length - 1]).toBe(doneCard)
+    expect(doneCard).toHaveTextContent('Done')
+    await user.click(within(doneCard).getByRole('button', { name: 'Details' }))
+    expect(doneCard.textContent).not.toContain('Re-scan (')
+    const mk = within(within(left()).getByTestId('factor-3')).getAllByTestId('optimizer-suggestion').find((el) => el.textContent?.includes('Spellbinder'))!
+    await user.click(within(mk).getByRole('button', { name: 'Details' }))
+    expect(mk.textContent).toContain(`Re-scan (${new Date('2026-10-29T03:45:00+00:00').toLocaleString()}): Still flagged on re-scan`)
   })
 
-  it('Agent read-test is its own row group: agent answer, formal term and code result, with the line only on a mismatch', async () => {
+  it('Read as Agent alerts appear only after the scan button is pressed, then Mark all as done and Clear all work until the next scan', async () => {
     const user = userEvent.setup()
-    await scanned({ agent: scriptedAgent() })
+    const w = await scanned({ agent: scriptedAgent() })
+    scanReplyId = w.tables.optimizer_scans[0].id as string
     open('/dashboard/optimization')
-    const [spell, orca] = await screen.findAllByTestId('optimizer-listing')
-    const group = within(spell).getByRole('region', { name: 'Read as Agent' })
-    expect(within(group).getByText('Read as Agent')).toBeInTheDocument()
-    // Separate from the pillar checklist and from the suggested fixes.
-    const checklist = within(spell).getByRole('table', { name: 'Pillar 1–5 checklist' })
-    expect(checklist.contains(group)).toBe(false)
-    expect(within(group).queryByTestId('optimizer-suggestion')).not.toBeInTheDocument()
-    const returns = within(group).getByTestId('read-test-returns')
-    expect(within(returns).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      'Can this be returned?', 'Yes, easy returnsQuote: "Easy returns."', '"Final Sale"', expect.stringMatching(/^Mismatch/),
-    ])
-    expect(within(group).getAllByTestId('read-test-customer-line').map((x) => x.textContent)).toEqual([
-      'An AI agent reading your listing would tell customers "Yes, easy returns", but your terms say "Final Sale".',
-    ])
-    expect(within(group).queryByTestId('read-test-all-match')).not.toBeInTheDocument()
-    for (const k of ['delivery', 'cost', 'colour_size']) expect(within(within(group).getByTestId(`read-test-${k}`)).getAllByRole('cell')[3]).toHaveTextContent(/^Match/)
+    await screen.findAllByTestId('optimizer-suggestion')
+    expect(within(right()).queryAllByTestId('read-alert')).toHaveLength(0) // the stored scan is not shown until pressed
+    await user.click(within(right()).getByRole('button', { name: 'Read as Agent Scan' }))
+    const alerts = await within(right()).findAllByTestId('read-alert')
+    const spell = alerts.find((a) => a.textContent?.includes('Spellbinder'))!
+    expect(spell).toHaveTextContent('Can this be returned?')
+    expect(spell).toHaveTextContent('Agent: Yes, easy returns (“Easy returns.”)')
+    expect(spell).toHaveTextContent('Your terms: "Final Sale"')
+    expect(spell).toHaveTextContent('Mismatch')
 
-    await user.click(within(orca).getByRole('button', { name: 'Show checklist and fixes' }))
-    const og = within(orca).getByRole('region', { name: 'Read as Agent' })
-    expect(within(og).getByTestId('read-test-all-match')).toHaveTextContent('Agent read-test: agent answers match formal terms.')
-    expect(within(og).queryByTestId('read-test-customer-line')).not.toBeInTheDocument()
+    await user.click(within(right()).getByRole('button', { name: 'Mark all as done' }))
+    for (const a of within(right()).getAllByTestId('read-alert')) expect(a).toHaveTextContent('Done')
+    expect(within(right()).getByRole('button', { name: 'Mark all as done' })).toBeDisabled()
+
+    await user.click(within(right()).getByRole('button', { name: 'Clear all' }))
+    expect(within(right()).queryAllByTestId('read-alert')).toHaveLength(0)
+    expect(within(right()).getByTestId('read-as-agent-empty')).toHaveTextContent('Cleared. Press Read as Agent Scan to list the alerts again.')
+    expect(within(left()).getAllByTestId('optimizer-suggestion').length).toBeGreaterThan(0) // the 5 factors are untouched
+
+    await user.click(within(right()).getByRole('button', { name: 'Read as Agent Scan' }))
+    expect(await within(right()).findAllByTestId('read-alert')).toHaveLength(alerts.length)
+    expect(within(right()).getAllByTestId('read-alert')[0]).toHaveTextContent('Mismatch')
   })
 
-  it('Agent read-test shows "unavailable" and no invented answer when Spark is not available', async () => {
-    await scanned()
+  it('a cleared Read as Agent list stays cleared when the page is opened again', async () => {
+    const w = await scanned({ agent: scriptedAgent() })
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ scanId: w.tables.optimizer_scans[0].id, cleared: true, done: false }))
     open('/dashboard/optimization')
-    const group = within((await screen.findAllByTestId('optimizer-listing'))[0]).getByRole('region', { name: 'Read as Agent' })
-    expect(within(group).getByTestId('read-test-unavailable')).toHaveTextContent('Agent read-test unavailable — deterministic checks only. Spark read-test unavailable (no model key).')
-    expect(within(group).queryByRole('table')).not.toBeInTheDocument()
-    expect(within(group).queryByTestId('read-test-customer-line')).not.toBeInTheDocument()
+    await screen.findAllByTestId('optimizer-suggestion')
+    expect(within(right()).getByTestId('read-as-agent-empty')).toHaveTextContent('Cleared.')
   })
 
-  it('a scan stored before Agent read-test existed shows no read-test group', async () => {
+  it('Read as Agent says "unavailable" and lists nothing invented when Spark is not available', async () => {
+    const user = userEvent.setup()
+    const w = await scanned()
+    scanReplyId = w.tables.optimizer_scans[0].id as string
+    open('/dashboard/optimization')
+    await user.click(await screen.findByRole('button', { name: 'Read as Agent Scan' }))
+    expect(await within(right()).findByTestId('read-test-unavailable')).toHaveTextContent('Agent read-test unavailable on 9 of 9 listings.')
+    expect(within(right()).queryAllByTestId('read-alert')).toHaveLength(0)
+    expect(within(right()).queryByTestId('read-test-all-match')).not.toBeInTheDocument()
+  })
+
+  it('while the agent is still reading, Read as Agent says so', async () => {
+    const user = userEvent.setup()
+    const w = await scanned({ agent: scriptedAgent() })
+    for (const r of w.tables.optimizer_scans[0].results as { read_test: { source: string } }[]) r.read_test.source = 'pending'
+    scanReplyId = w.tables.optimizer_scans[0].id as string
+    open('/dashboard/optimization')
+    await user.click(await screen.findByRole('button', { name: 'Read as Agent Scan' }))
+    expect(await within(right()).findByTestId('read-test-pending')).toHaveTextContent('Agent is reading your listings… 0 of 9 done.')
+  })
+
+  it('a scan stored before Agent read-test existed lists no Read as Agent alerts', async () => {
+    const user = userEvent.setup()
     const w = await scanned()
     for (const r of w.tables.optimizer_scans[0].results as Record<string, unknown>[]) delete r.read_test
+    scanReplyId = w.tables.optimizer_scans[0].id as string
     open('/dashboard/optimization')
-    expect(within((await screen.findAllByTestId('optimizer-listing'))[0]).queryByRole('region', { name: 'Read as Agent' })).not.toBeInTheDocument()
-  })
-
-  it('filters by pillar and flag type only', async () => {
-    const user = userEvent.setup()
-    await scanned()
-    open('/dashboard/optimization')
-    await screen.findAllByTestId('optimizer-listing')
-    await user.selectOptions(screen.getByLabelText('Flag type'), 'contradiction')
-    expect(screen.getAllByTestId('optimizer-listing')).toHaveLength(1)
-    await user.selectOptions(screen.getByLabelText('Flag type'), 'all')
-    await user.selectOptions(screen.getByLabelText('Pillar'), '1')
-    expect(screen.getAllByTestId('optimizer-listing')).toHaveLength(9)
-    await user.selectOptions(screen.getByLabelText('Flag type'), 'contradiction')
-    expect(screen.getByText('No listings match these filters.')).toBeInTheDocument() // Pillar 1 has no contradiction here
-    await user.selectOptions(screen.getByLabelText('Pillar'), '2')
-    expect(screen.getAllByTestId('optimizer-listing')).toHaveLength(1)
-    expect(within(screen.getByRole('group', { name: 'Filters' })).getAllByRole('combobox')).toHaveLength(2)
+    await user.click(await screen.findByRole('button', { name: 'Read as Agent Scan' }))
+    await screen.findByText(/Scan finished/)
+    expect(within(right()).queryAllByTestId('read-alert')).toHaveLength(0)
   })
 
 })

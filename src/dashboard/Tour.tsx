@@ -35,14 +35,14 @@ export const STEPS: Step[] = [
   {
     route: '/dashboard/optimization',
     title: 'Agent Optimize',
-    body: 'Listings reviewed against five pillars, with suggested fixes you approve.',
+    body: 'Listings reviewed against five factors, with a suggested fix for each alert.',
     target: '[data-tour="pillars"]',
   },
   {
     route: '/dashboard/optimization',
     title: 'Read as Agent',
-    body: 'A read-test showing how an agent reads each listing, beside your formal terms.',
-    target: '[data-testid="agent-read-test"]',
+    body: 'A blind shopping agent reads your listings; anything it gets wrong against your terms is listed here.',
+    target: '[data-testid="read-as-agent-section"]',
   },
 ]
 
