@@ -522,14 +522,14 @@ const emptyRules = (): Rules => finishRules({
   delivery_by: null, return_policy_required: null, product_scope: null,
 })
 
-// Nothing is written until the customer orders. The reply that picks a product and names a payment is the
-// customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
 // The function's entry point: an order-number request, or a chat turn.
 export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | OrderStatusReply> {
   if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).action === 'order_status') return orderStatus(raw as Record<string, unknown>, deps)
   return handle(raw, deps)
 }
 
+// Nothing is written until the customer orders. The reply that picks a product and names a payment is the
+// customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
 export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
   const req = parseRequest(raw)
   if (typeof req === 'string') return { type: 'error', message: req }
