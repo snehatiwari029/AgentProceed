@@ -18,6 +18,16 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } })
 
+// Logs how long each Muse Spark call takes (start offset and duration), so a slow scan can be read from the logs.
+const timedFetch = (t0: number, label: string): typeof fetch => async (input, init) => {
+  const start = Date.now() - t0
+  try { return await fetch(input, init) } finally { console.log(`spark ${label} start=${start}ms took=${Date.now() - t0 - start}ms`) }
+}
+
+// Supabase's edge runtime keeps a background promise alive after the response is sent.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
+const inBackground = typeof EdgeRuntime !== 'undefined' ? (p: Promise<unknown>) => EdgeRuntime!.waitUntil(p) : undefined
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ type: 'error', message: 'POST only' }, 405)
@@ -29,17 +39,20 @@ Deno.serve(async (req) => {
     const url = Deno.env.get('SUPABASE_URL')
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!url || !serviceKey) return json({ type: 'error', message: 'Server is missing its Supabase settings.' }, 500)
+    const t0 = Date.now()
     const deps = {
       db: createOptimizerDb(createClient(url, serviceKey, { auth: { persistSession: false } })),
-      reader: createSparkListingReader(Deno.env.get('MODEL_API_KEY')),
-      agent: createSparkAgentReader(Deno.env.get('MODEL_API_KEY')),
+      reader: createSparkListingReader(Deno.env.get('MODEL_API_KEY'), timedFetch(t0, 'deconstruct')),
+      agent: createSparkAgentReader(Deno.env.get('MODEL_API_KEY'), timedFetch(t0, 'read-test')),
       fetchMarkup: () => fetchStoreMarkup(Deno.env.get('STORE_PAGE_URL')),
       now: () => new Date(),
       newId: () => crypto.randomUUID(),
+      inBackground,
     }
     const run = body.action === 'scan' ? runScan : body.action === 'decide' ? decide : body.action === 'approve_all' ? approveAll : null
     if (!run) return json({ type: 'error', message: 'action must be scan, decide or approve_all.' }, 400)
     const reply = await run(body, deps)
+    console.log(`optimizer ${body.action} done in ${Date.now() - t0}ms`)
     return json(reply, reply.type === 'error' ? 400 : 200)
   } catch (e) {
     console.error('optimizer failure', e instanceof Error ? e.message : e)

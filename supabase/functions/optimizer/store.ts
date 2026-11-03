@@ -35,6 +35,13 @@ export function createOptimizerDb(db: Db): OptimizerDb {
     async insertScan(row) {
       must(await db.from('optimizer_scans').insert(row), 'insert scan')
     },
+    async latestScan(merchantId) {
+      const r = await db.from('optimizer_scans').select('id,results').eq('merchant_id', merchantId).order('scanned_at', { ascending: false }).limit(1)
+      return must<{ id: string; results: unknown }[]>(r, 'read last scan')?.[0] ?? null
+    },
+    async updateScanResults(merchantId, id, results) {
+      must(await db.from('optimizer_scans').update({ results }).eq('id', id).eq('merchant_id', merchantId), 'update scan results')
+    },
   }
 }
 
