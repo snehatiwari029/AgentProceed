@@ -315,10 +315,15 @@ export function pending(row: Row, today: string): ReadTest {
 // Same displayed listing, same day: Spark would be sent exactly the same input, so its last answers are reused and
 // code compares them again with the current formal terms. Anything different (listing text, prices, shipping, the
 // date) means a new blind read.
+// Key order does not matter: the stored copy comes back from a jsonb column, which reorders object keys.
+const stable = (v: unknown): string => Array.isArray(v) ? `[${v.map(stable).join(',')}]`
+  : v && typeof v === 'object' ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}`
+    : JSON.stringify(v)
+
 export function reuseReadTest(prev: ReadTest | undefined | null, row: Row, today: string): ReadTest | null {
   if (!prev || prev.source !== 'muse-spark' || !prev.answers) return null
   const input = readTestInput(row, today)
-  if (JSON.stringify(prev.input) !== JSON.stringify(input)) return null
+  if (stable(prev.input) !== stable(input)) return null
   const questions = compareReadTest(prev.answers, row, today)
   return {
     ...prev, input, today, questions, summary: summaryOf(questions),

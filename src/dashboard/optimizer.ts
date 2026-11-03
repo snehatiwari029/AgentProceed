@@ -53,9 +53,9 @@ export const filledIn = (s: Pick<Suggestion, 'value_fields' | 'merchant_values'>
   s.value_fields.every((f) => (s.merchant_values?.[f] ?? '').trim() !== '')
 
 export const STATUS_LABEL: Record<Suggestion['status'], string> = {
-  pending: 'Pending your decision',
-  approved: 'Approved — awaiting merchant application',
+  pending: 'Open',
+  approved: 'Marked as done — apply the fix in your store; the next scan checks it',
   rejected: 'Rejected',
   resolved: 'Resolved on re-scan',
-  still_flagged: 'Still flagged — see re-scan evidence',
+  still_flagged: 'Still flagged after re-scan',
 }
