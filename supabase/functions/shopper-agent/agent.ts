@@ -92,6 +92,9 @@ export type AgentReply = { session_id?: string; steps?: string[]; draft?: Rules;
   | { type: 'error'; message: string }
 )
 
+// The phone asks for the order number after an order. The order system assigns it; the brain only relays it.
+export type OrderStatusReply = { type: 'order_status'; ready: boolean; order_number: string | null }
+
 export type AgentRequest = {
   messages: Msg[]
   session_id: string | null
@@ -121,7 +124,12 @@ export type Deps = {
   demoDate?: string | null
   newId: () => string
   // The order system's "order received" signal: gets the session id only, returns nothing the agent can read.
+  // It runs in the background: the customer's confirmation never waits for the order system.
   onOrderReceived?: (sessionId: string) => Promise<void>
+  // Each "Muse is checking: ..." line, as soon as Muse decides on it, so the phone can show it live.
+  onStep?: (text: string) => void
+  // Asks the order system for this session's order number (null until it has one). The brain sees only the number.
+  orderNumber?: (sessionId: string) => Promise<string | null>
 }
 
 // ---------- small helpers ----------
@@ -392,6 +400,7 @@ function prompt(t: string, rules: Rules | null, offers: Offer[]): string {
     `Rules the customer has told you so far: ${known}. Act only inside them. They cannot be widened.`,
     "When the customer states what they want, first call set_order_rules with only what they actually said. Anything not mentioned is null. Never use false for something they did not mention. Turn a day like \"Friday\" into the exact date from the upcoming days.",
     "Use the tools to look at the store's products. You only see the store's product summaries, prices and shipping options.",
+    'set_order_rules already returns the store products that fit the rules, with everything search_products and get_product would show. Go straight to propose_products from them; search again only if none of them fits.',
     'Then call propose_products with one or two options. For each option choose the shipping method and write a short summary of the return situation from the product page text. The customer sees item price, your summary and the delivery day on each card.',
     "The 'message' of propose_products must be ONE friendly sentence that restates only what the customer told you (for example budget, arrival day, returns) and then introduces the options. Never mention anything they did not say. Never write 'null', 'not specified' or a list of fields.",
     'Do not ask about colour, size, delivery, returns or anything else the customer did not mention. Only if product selection is impossible without it.',
@@ -451,7 +460,11 @@ async function runLoop(
     for (const call of reply.tool_calls) {
       const args = parseArgs(call.function.arguments)
       const w = clean(args.why, 100)
-      if (w) steps.push(`Muse is checking: ${w}`)
+      if (w) {
+        const line = `Muse is checking: ${w}`
+        steps.push(line)
+        try { deps.onStep?.(line) } catch { /* a closed stream never stops the turn */ }
+      }
       const out = await run(call.function.name, args)
       messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(out.result) })
       if (out.done && !finished) finished = out.done
@@ -509,6 +522,12 @@ const emptyRules = (): Rules => finishRules({
   delivery_by: null, return_policy_required: null, product_scope: null,
 })
 
+// The function's entry point: an order-number request, or a chat turn.
+export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | OrderStatusReply> {
+  if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).action === 'order_status') return orderStatus(raw as Record<string, unknown>, deps)
+  return handle(raw, deps)
+}
+
 // Nothing is written until the customer orders. The reply that picks a product and names a payment is the
 // customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
 export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
@@ -528,7 +547,14 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
   const reply = await runLoop(deps, prompt(t, ctx.rules, req.offers), req.messages, TOOLS, async (name, args) => {
     if (name === 'set_order_rules') {
       ctx.rules = rulesFromModel(args, t)
-      return { result: { ok: true } }
+      // Hand back the products that fit, in the same view search_products gives, so Muse can propose without
+      // another round trip. Category and size only: the budget is never enforced here (the receipt must catch an overstep).
+      const r = ctx.rules
+      const scope = (r.product_scope ?? '').toLowerCase()
+      const cat = /snowboard/.test(scope) ? 'snowboard' : /\bski/.test(scope) ? 'ski' : null
+      const fits = products.filter((p) => (!cat || p.category === cat) &&
+        (r.size_min_cm === null || p.size_cm >= r.size_min_cm) && (r.size_max_cm === null || p.size_cm <= r.size_max_cm))
+      return { result: { ok: true, matching_products: fits.map((p) => productView(p, t)) } }
     }
     if (name === 'search_products') {
       const cat = args.category === 'snowboard' || args.category === 'ski' ? args.category : null
@@ -610,7 +636,9 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
       }
       const seq = await store.addAction(grantId, 'checkout', detail, { returns: offer.summary })
       await store.logStep(sessionId, 'order_received', { product_id: p.id, total_cents: pd.total_cents, action_seq: seq }, false)
-      try { await deps.onOrderReceived?.(sessionId) } catch { /* the order stands; the order system will show it needs attention */ }
+      // Told in the background: the confirmation does not wait for the order system. If the call fails, the order
+      // stands and the order system shows it as needing attention.
+      try { deps.onOrderReceived?.(sessionId)?.catch(() => {}) } catch { /* same */ }
       const order: OrderView = {
         product_name: p.name, brand: p.brand, size_cm: p.size_cm, colour: p.colour, item_price_cents: p.price_cents,
         shipping_label: offer.shipping_method === 'expedited' ? 'Expedited shipping' : 'Standard shipping',
@@ -621,4 +649,13 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
     return { result: { error: `Unknown tool ${name}` } }
   })
   return ctx.rules ? { ...reply, draft: ctx.rules } : reply
+}
+
+// The order number for the phone's confirmation card. Read only: it never writes, and never calls the model.
+async function orderStatus(raw: Record<string, unknown>, deps: Deps): Promise<OrderStatusReply | AgentReply> {
+  const sid = raw.session_id
+  if (typeof sid !== 'string' || !UUID_RE.test(sid)) return { type: 'error', message: 'Bad session.' }
+  if (!(await deps.store.hasStep(sid, 'order_received'))) return { type: 'error', message: 'No order in this chat yet.' }
+  const number = deps.orderNumber ? await deps.orderNumber(sid).catch(() => null) : null
+  return { type: 'order_status', ready: !!number, order_number: number }
 }

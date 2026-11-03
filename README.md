@@ -75,6 +75,8 @@ Product photos are stored in the `product-images` bucket. Each product has `imag
 - **Flow (Amendment 5):** the customer sends a request; Muse replies with one sentence restating only what was said, two option cards (price, returns summary, arrival day; no total) and, only if needed, "Pick one, and tell me which payment to charge." The customer's reply that picks a product and names PayPal is the confirmation: only then are the session, grant, proposal and action written. Session log order: Verified agent detected (simulated), Session started, Intent captured, Intent hash recorded, Grant captured, Order received. "Receipt issued" is written by the receipt function (next build).
 - **Stored:** fields only. The chat text is never stored, only its SHA-256 (`private_chat_hash`).
 - To redeploy: `supabase functions deploy shopper-agent --no-verify-jwt` (the folder is self-contained; `hash.ts` is a tested copy of `_shared/hash.ts`).
+- **Speed:** `set_order_rules` hands back the products that fit, so a first reply is usually two Spark calls. The phone asks for a stream (`Accept: application/x-ndjson`) and shows each "Muse is checking" line as it happens. The order reply does not wait for the auditor (it runs in the background via `EdgeRuntime.waitUntil`).
+- **Order number:** after an order the phone asks `shopper-agent` (`{"action":"order_status","session_id":…}`) until the number exists. `shopper-agent` relays it from the order system's read-only `order-status` function (`supabase/functions/order-status`, session id in, order number out), so the brain itself never reads receipts. Deploy: `supabase functions deploy order-status --no-verify-jwt`.
 
 ## Dispute Agent (Evidence Packet, `/dashboard/disputes` + `disputes`)
 

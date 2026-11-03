@@ -11,14 +11,22 @@ const offers = [
 
 let calls: { url: string; headers: Record<string, string>; body: any }[]
 let replies: unknown[]
+let orderLookups: string[]
 
 beforeEach(() => {
   calls = []
   replies = []
   vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co')
   vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test')
+  orderLookups = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
-    calls.push({ url, headers: init.headers as Record<string, string>, body: JSON.parse(init.body as string) })
+    const body = JSON.parse(init.body as string)
+    // The order-number lookup after an order is answered on its own, so it never takes a chat reply.
+    if (body.action === 'order_status') {
+      orderLookups.push(body.session_id)
+      return new Response(JSON.stringify({ type: 'order_status', ready: true, order_number: '15004' }), { status: 200 })
+    }
+    calls.push({ url, headers: init.headers as Record<string, string>, body })
     return new Response(JSON.stringify(replies.shift()), { status: 200 })
   }))
   Element.prototype.scrollIntoView = vi.fn()
@@ -161,6 +169,45 @@ describe('/chat phone screen', () => {
     await user.type(screen.getByLabelText('Message Muse'), 'hi')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('MODEL_API_KEY not set in Supabase secrets'))
+  })
+  it('after the order, shows the order number the store assigned, so a tester can follow up', async () => {
+    const user = userEvent.setup()
+    replies.push(
+      { type: 'proposals', session_id: undefined, text: 'Here are two options:', follow_up: "Pick one and I'll place the order.", offers, draft: {} },
+      { type: 'ordered', session_id: '00000000-0000-4000-8000-000000000001', text: 'Order received.', order: { product_name: 'Spellbinder Snowboard 2026/2027', brand: 'Burton', size_cm: 156, colour: 'Serpent', item_price_cents: 44995, shipping_label: 'Expedited shipping', shipping_cents: 6000, total_cents: 50995, delivery_label: 'Fri Oct 30', payment_label: 'Demo Checkout — PayPal' } },
+    )
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), HERO)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await user.click((await screen.findAllByRole('button', { name: /Pick this one/ }))[0])
+    await waitFor(() => expect(screen.getByTestId('order-number')).toHaveTextContent('Order number 15004'), { timeout: 4000 })
+    expect(orderLookups).toEqual(['00000000-0000-4000-8000-000000000001'])
+  })
+
+  it('shows each "Muse is checking" line as it streams in, before the reply arrives', async () => {
+    const user = userEvent.setup()
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => { release = r })
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      const enc = new TextEncoder()
+      const body = new ReadableStream<Uint8Array>({
+        async start(c) {
+          c.enqueue(enc.encode(JSON.stringify({ type: 'step', text: 'Muse is checking: Recording your snowboard needs' }) + '\n'))
+          await gate
+          c.enqueue(enc.encode(JSON.stringify({ type: 'reply', reply: { type: 'message', text: 'Done.', steps: ['Muse is checking: Recording your snowboard needs'] } }) + '\n'))
+          c.close()
+        },
+      })
+      return new Response(body, { status: 200, headers: { 'content-type': 'application/x-ndjson' } })
+    }))
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), HERO)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Muse is checking: Recording your snowboard needs')).toBeInTheDocument()
+    expect(screen.getByText('Muse is thinking…')).toBeInTheDocument()
+    release()
+    expect(await screen.findByText('Done.')).toBeInTheDocument()
+    expect(screen.getAllByText('Muse is checking: Recording your snowboard needs')).toHaveLength(1)
   })
 })
 

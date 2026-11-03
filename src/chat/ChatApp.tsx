@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { askAgent } from './api'
+import { askAgent, orderNumber } from './api'
 import PhoneFrame from './PhoneFrame'
 import { Bubble, OfferCard, OrderCard, StatusLine } from './Cards'
 import type { AgentReply, ChatItem, OfferCardData } from './types'
@@ -25,6 +25,10 @@ export default function ChatApp() {
   const [ordered, setOrdered] = useState(false)
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState('')
+  // "Muse is checking" lines streamed while Muse works; replaced by the reply's own lines when it arrives.
+  const [live, setLive] = useState<string[]>([])
+  // The order number: 'pending' while the store assigns it, 'late' if it has not arrived after a while.
+  const [number, setNumber] = useState<string | 'pending' | 'late' | null>(null)
   const next = useRef(1)
   const end = useRef<HTMLDivElement>(null)
 
@@ -47,9 +51,28 @@ export default function ChatApp() {
       add.push({ id: id(), kind: 'muse', text: reply.text }, { id: id(), kind: 'offers', offers: reply.offers }, { id: id(), kind: 'muse', text: reply.follow_up })
     } else if (reply.type === 'ordered') {
       setOrdered(true)
+      if (reply.session_id) followOrder(reply.session_id)
       add.push({ id: id(), kind: 'muse', text: reply.text }, { id: id(), kind: 'order', order: reply.order })
     } else add.push({ id: id(), kind: 'problem', text: reply.message })
     setItems([...base, ...add])
+  }
+
+  // Asks for the order number until the store has assigned it (usually a few seconds after the order).
+  // Stops when the screen closes.
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  function followOrder(id: string) {
+    setNumber('pending')
+    let tries = 0
+    const tick = async () => {
+      if (!alive.current) return
+      const n = await orderNumber(id)
+      if (!alive.current) return
+      if (n) return setNumber(n)
+      if (++tries >= 30) return setNumber('late')
+      window.setTimeout(tick, 1500)
+    }
+    window.setTimeout(tick, 1000)
   }
 
   async function send(raw: string) {
@@ -60,7 +83,9 @@ export default function ChatApp() {
     setText('')
     setAskPay(false)
     setBusy(true)
-    const reply = await askAgent({ messages: words(base), session_id: sessionId, draft, offers })
+    setLive([])
+    const reply = await askAgent({ messages: words(base), session_id: sessionId, draft, offers }, (line) => setLive((l) => [...l, line]))
+    setLive([])
     setBusy(false)
     show(reply, base)
   }
@@ -128,10 +153,11 @@ export default function ChatApp() {
                 {i.offers.map((o) => <OfferCard key={o.product_id} offer={o} disabled={busy || ordered} onPick={() => void pick(o)} />)}
               </div>
             )
-            case 'order': return <OrderCard key={i.id} order={i.order} />
+            case 'order': return <OrderCard key={i.id} order={i.order} number={number} />
             case 'problem': return <p key={i.id} role="alert" className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{i.text}</p>
           }
         })}
+        {busy && live.map((l, k) => <StatusLine key={`live-${k}`}>{l}</StatusLine>)}
         {busy && <StatusLine>Muse is thinking…</StatusLine>}
         <div ref={end} />
       </div>
