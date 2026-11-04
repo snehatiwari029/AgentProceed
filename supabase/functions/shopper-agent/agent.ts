@@ -529,8 +529,6 @@ export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | Or
   return handle(raw, deps)
 }
 
-// Nothing is written until the customer orders. The reply that picks a product and names a payment is the
-// customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
 // ---------- off-topic gate: no Spark call for a chat that is not about shopping this store ----------
 // A word about shopping, skiing or snowboarding anywhere in what the customer has typed sends the chat to Muse.
 // A chat with none gets this fixed reply at once, with two demo orders to tap.
@@ -548,6 +546,8 @@ export const DEMO_ORDERS: Suggestion[] = [
   { label: 'An order held for review', text: "Find and purchase a less than $500 snowboard that will arrive at my address in 2 days. I should be able to return it if it doesn't work for me." },
 ]
 
+// Nothing is written until the customer orders. The reply that picks a product and names a payment is the
+// customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
 export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
   const req = parseRequest(raw)
   if (typeof req === 'string') return { type: 'error', message: req }
