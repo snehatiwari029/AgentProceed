@@ -45,7 +45,10 @@ export default function ChatApp() {
     if (reply.session_id) setSessionId(reply.session_id)
     if (reply.draft !== undefined) setDraft(reply.draft)
     setAskPay(reply.ask_payment === true)
-    if (reply.type === 'message') add.push({ id: id(), kind: 'muse', text: reply.text })
+    if (reply.type === 'message') {
+      add.push({ id: id(), kind: 'muse', text: reply.text })
+      if (reply.suggestions?.length) add.push({ id: id(), kind: 'suggest', suggestions: reply.suggestions })
+    }
     else if (reply.type === 'proposals') {
       setOffers(reply.offers)
       add.push({ id: id(), kind: 'muse', text: reply.text }, { id: id(), kind: 'offers', offers: reply.offers }, { id: id(), kind: 'muse', text: reply.follow_up })
@@ -155,6 +158,19 @@ export default function ChatApp() {
             )
             case 'order': return <OrderCard key={i.id} order={i.order} number={number} />
             case 'problem': return <p key={i.id} role="alert" className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{i.text}</p>
+            case 'suggest': return (
+              <div key={i.id} aria-label="Suggested orders" className="space-y-1.5">
+                {i.suggestions.map((sg) => (
+                  <button
+                    key={sg.label} type="button" disabled={busy || ordered} onClick={() => void send(sg.text)}
+                    className="block w-full rounded-xl border-2 border-indigo-500 bg-indigo-50 px-3 py-2 text-left text-sm text-indigo-900 disabled:opacity-50"
+                  >
+                    <span className="block font-semibold">{sg.label}</span>
+                    <span className="block text-xs text-indigo-800">{sg.text}</span>
+                  </button>
+                ))}
+              </div>
+            )
           }
         })}
         {busy && live.map((l, k) => <StatusLine key={`live-${k}`}>{l}</StatusLine>)}

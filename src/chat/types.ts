@@ -23,7 +23,10 @@ export type OrderData = {
   payment_label: string
 }
 
-export type AgentReply = { session_id?: string; steps?: string[]; draft?: unknown; ask_payment?: boolean } & (
+// Tap-to-send prompts Muse offers (e.g. the two demo orders after an off-topic message).
+export type Suggestion = { label: string; text: string }
+
+export type AgentReply = { session_id?: string; steps?: string[]; draft?: unknown; ask_payment?: boolean; suggestions?: Suggestion[] } & (
   | { type: 'message'; text: string }
   | { type: 'proposals'; text: string; follow_up: string; offers: (OfferCardData & Record<string, unknown>)[] }
   | { type: 'ordered'; text: string; order: OrderData }
@@ -38,3 +41,4 @@ export type ChatItem =
   | { id: number; kind: 'offers'; offers: (OfferCardData & Record<string, unknown>)[] }
   | { id: number; kind: 'order'; order: OrderData }
   | { id: number; kind: 'problem'; text: string }
+  | { id: number; kind: 'suggest'; suggestions: Suggestion[] }
