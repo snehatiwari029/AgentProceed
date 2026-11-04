@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ChatApp from '../chat/ChatApp'
 
@@ -209,5 +209,24 @@ describe('/chat phone screen', () => {
     expect(await screen.findByText('Done.')).toBeInTheDocument()
     expect(screen.getAllByText('Muse is checking: Recording your snowboard needs')).toHaveLength(1)
   })
-})
 
+  it('after an off-topic message shows the two demo orders; tapping one sends its words', async () => {
+    const user = userEvent.setup()
+    replies = [
+      { type: 'message', text: 'Nice try! This chat is a demo for shopping at the Northwind Outfitters store. Try one of these two orders:', steps: [],
+        suggestions: [{ label: 'An order that passes', text: 'Find a returnable snowboard.' }, { label: 'An order held for review', text: 'Find a snowboard in 2 days.' }] },
+      { type: 'message', text: 'On it.', steps: [] },
+    ]
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), 'tell me a joke')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText(/^Nice try!/)).toBeInTheDocument()
+    const group = screen.getByLabelText('Suggested orders')
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'An order that passesFind a returnable snowboard.', 'An order held for reviewFind a snowboard in 2 days.',
+    ])
+    await user.click(within(group).getByRole('button', { name: /An order that passes/ }))
+    expect(calls[1].body.messages.at(-1)).toEqual({ role: 'user', text: 'Find a returnable snowboard.' })
+    expect(await screen.findByText('On it.')).toBeInTheDocument()
+  })
+})

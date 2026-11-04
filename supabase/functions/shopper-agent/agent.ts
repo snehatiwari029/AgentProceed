@@ -85,7 +85,8 @@ export type OrderView = {
   payment_label: string
 }
 
-export type AgentReply = { session_id?: string; steps?: string[]; draft?: Rules; ask_payment?: boolean } & (
+export type Suggestion = { label: string; text: string }
+export type AgentReply = { session_id?: string; steps?: string[]; draft?: Rules; ask_payment?: boolean; suggestions?: Suggestion[] } & (
   | { type: 'message'; text: string }
   | { type: 'proposals'; text: string; offers: Offer[]; follow_up: string }
   | { type: 'ordered'; text: string; order: OrderView }
@@ -530,6 +531,23 @@ export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | Or
 
 // Nothing is written until the customer orders. The reply that picks a product and names a payment is the
 // customer's confirmation: it opens the session, seals the grant from the rules gathered so far, then records the order.
+// ---------- off-topic gate: no Spark call for a chat that is not about shopping this store ----------
+// A word about shopping, skiing or snowboarding anywhere in what the customer has typed sends the chat to Muse.
+// A chat with none gets this fixed reply at once, with two demo orders to tap.
+const ON_TOPIC = new RegExp([
+  'snow\\w*', 'ski', 'skis', 'skiing', 'skier\\w*', 'board\\w*', 'binding\\w*', 'boots?', 'goggles?', 'helmets?', 'jackets?', 'gloves?', 'mittens?', 'poles?', 'gear',
+  'buy\\w*', 'bought', 'purchas\\w*', 'order\\w*', 'shop\\w*', 'checkout', 'cart', 'pay\\w*', 'prices?', 'priced', 'cost\\w*', 'budget', 'cheap\\w*', 'afford\\w*', 'dollars?', 'usd',
+  'deliver\\w*', 'ship\\w*', 'arriv\\w*', 'returns?', 'returnable', 'refund\\w*', 'sizes?', 'cm', 'colou?rs?', 'products?', 'brands?', 'store', 'northwind',
+  'burton', 'salomon', 'capita', 'jones', 'nitro', 'atomic', 'rossignol', 'lib\\s*tech', 'beginner', 'freestyle', 'powder', 'all-mountain', 'mountain', 'slopes?', 'resort', 'winter',
+].map((w) => `\\b${w}\\b`).join('|') + '|\\$\\s*\\d', 'i')
+export const onTopic = (text: string) => ON_TOPIC.test(text)
+
+export const OFF_TOPIC_TEXT = 'Nice try! This chat is a demo for shopping at the Northwind Outfitters store. Try one of these two orders:'
+export const DEMO_ORDERS: Suggestion[] = [
+  { label: 'An order that passes', text: 'Find and purchase a returnable snowboard under $500 that arrives in 3 days with free standard shipping.' },
+  { label: 'An order held for review', text: "Find and purchase a less than $500 snowboard that will arrive at my address in 2 days. I should be able to return it if it doesn't work for me." },
+]
+
 export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
   const req = parseRequest(raw)
   if (typeof req === 'string') return { type: 'error', message: req }
@@ -538,6 +556,11 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
 
   if (req.session_id && (await store.hasStep(req.session_id, 'order_received'))) {
     return { type: 'message', text: 'Your order has already been placed.', session_id: req.session_id, steps: [] }
+  }
+
+  // Nothing typed so far is about shopping, and no rules or offers are in play: answer without Muse.
+  if (!req.draft && req.offers.length === 0 && !req.messages.some((m) => m.role === 'user' && onTopic(m.text))) {
+    return { type: 'message', text: OFF_TOPIC_TEXT, suggestions: DEMO_ORDERS, steps: [], ...(req.session_id ? { session_id: req.session_id } : {}) }
   }
 
   const products = await store.listProducts()

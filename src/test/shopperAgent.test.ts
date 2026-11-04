@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { handle, rulesFromDraft, rulesFromModel, type AgentReply, type Deps, type ProductRow, type Step, type Store } from '../../supabase/functions/shopper-agent/agent'
+import { DEMO_ORDERS, handle, OFF_TOPIC_TEXT, onTopic, rulesFromDraft, rulesFromModel, type AgentReply, type Deps, type ProductRow, type Step, type Store } from '../../supabase/functions/shopper-agent/agent'
 import { appendChained, type ChainDb } from '../../supabase/functions/shopper-agent/chain'
 import { createMetaClient, META_CHAT_URL, MODEL_NAME, type ChatMessage, type ModelClient, type ModelReply } from '../../supabase/functions/shopper-agent/model'
 import { verifyChain, type ChainRecord } from '../shared/chain'
@@ -136,7 +136,7 @@ describe('shopper-agent: first reply', () => {
   it('refuses to propose before the rules are recorded', async () => {
     const m = memoryStore()
     const script = fakeModel([() => bothOffers(), () => ({ content: 'What are you shopping for?' })])
-    const r = await asOk(handle({ messages: [{ role: 'user', text: 'hi' }] }, deps(script.model, m.store)), 'message')
+    const r = await asOk(handle({ messages: [{ role: 'user', text: 'hi, I want a snowboard' }] }, deps(script.model, m.store)), 'message')
     expect(r.text).toContain('shopping for')
   })
 
@@ -172,7 +172,7 @@ describe('shopper-agent: never offers something that misses the customer\'s date
       () => call('propose_products', { message: 'x', payment_stated: false, why: 'x', offers: [{ product_id: ORCA, shipping_method: 'standard', summary: 'Free returns' }] }),
       () => ({ content: "Sorry, nothing can arrive by Tuesday." }),
     ])
-    const r = await asOk(handle({ messages: [{ role: 'user', text: 'by Tuesday' }] }, deps(script.model, m.store)), 'message')
+    const r = await asOk(handle({ messages: [{ role: 'user', text: 'a snowboard by Tuesday' }] }, deps(script.model, m.store)), 'message')
     expect(r.text).toContain('nothing can arrive')
     expect(JSON.stringify(script.seen[2])).toContain('No shipping option for this product arrives in time')
   })
@@ -318,5 +318,37 @@ describe('shopper-agent: rules written as the word "null"', () => {
     expect(r.colour_preference).toBeNull()
     expect(r.product_scope).toBeNull()
     expect(rulesFromDraft({ colour_preference: 'n/a', product_scope: 'snowboard' })?.colour_preference).toBeNull()
+  })
+})
+
+describe('shopper-agent: off-topic gate', () => {
+  it('a chat with nothing about shopping gets the fixed reply and two demo orders, with no Spark call and no store read', async () => {
+    const m = memoryStore()
+    const script = fakeModel([])
+    let listed = 0
+    const store = { ...m.store, listProducts: async () => { listed++; return m.store.listProducts() } }
+    for (const text of ['hi', 'tell me a joke', 'what is the capital of France?']) {
+      const r = await asOk(handle({ messages: [{ role: 'user', text }] }, deps(script.model, store)), 'message')
+      expect(r.text).toBe(OFF_TOPIC_TEXT)
+      expect(r.text).toBe('Nice try! This chat is a demo for shopping at the Northwind Outfitters store. Try one of these two orders:')
+      expect(r.suggestions).toEqual(DEMO_ORDERS)
+    }
+    expect(script.seen).toHaveLength(0)
+    expect(listed).toBe(0)
+    expect(DEMO_ORDERS.map((d) => d.label)).toEqual(['An order that passes', 'An order held for review'])
+  })
+
+  it('once the chat is about shopping, later short answers ("yes", "Visa") still go to Muse', async () => {
+    const m = memoryStore()
+    const script = fakeModel([() => ({ content: 'Got it.' })])
+    const r = await asOk(handle({ messages: [{ role: 'user', text: 'I need a snowboard' }, { role: 'assistant', text: 'What size?' }, { role: 'user', text: 'yes' }] }, deps(script.model, m.store)), 'message')
+    expect(r.text).toBe('Got it.')
+    expect(script.seen).toHaveLength(1)
+  })
+
+  it('both demo orders, and shopping words, pass the gate; small talk does not', () => {
+    for (const d of DEMO_ORDERS) expect(onTopic(d.text)).toBe(true)
+    for (const t of ['skis for my kid', 'under $450', 'can I return it?', 'Burton please', 'do you have boots?']) expect(onTopic(t)).toBe(true)
+    for (const t of ['hi', 'hello there', 'write a poem about cats', 'skip this', 'I like skin care']) expect(onTopic(t)).toBe(false)
   })
 })
