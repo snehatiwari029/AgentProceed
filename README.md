@@ -5,7 +5,7 @@
 AI agents are becoming the new shoppers. Payment networks and banks have built secure protocols so consumers can let agents pay on their behalf. Those protocols verify that the user authorized payment. They do not verify that the agent bought what the shopper actually intended. That gap between intent and action drives returns, refunds, and chargebacks, and it leaves merchants with listings agents cannot read well, suspicious agent orders to screen by hand, and disputes with no playbook. Agent Proceed closes the merchant side of that gap.
 
 **Live demo:** https://agent-receipt-mu.vercel.app
-**Demo video:** [link added at submission]
+**Demo video:** https://youtu.be/5V1rFohJAJs
 **Built for:** Meta Global AI Developer Hackathon (submission November 4, 2026)
 
 ## Try it in two minutes
