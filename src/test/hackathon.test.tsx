@@ -16,7 +16,7 @@ describe('Hackathon page', () => {
     expect(screen.getByTestId('demo-dashboard')).toHaveAttribute('href', '/dashboard')
     expect(screen.getByTestId('demo-shop')).toHaveTextContent('Northwind Outfitters')
     expect(screen.getByTestId('demo-dashboard')).toHaveTextContent('pre-filled for Northwind Outfitters')
-    expect(screen.getByRole('link', { name: /Source code on GitHub/ })).toHaveAttribute('href', 'https://github.com/snehatiwari029/AgentReceipt')
+    expect(screen.getByRole('link', { name: /Source code on GitHub/ })).toHaveAttribute('href', 'https://github.com/snehatiwari029/AgentProceed')
     const steps = within(screen.getByRole('list')).getAllByRole('heading').map((h) => h.textContent)
     expect(steps).toEqual(['Chat', 'Store', 'Dashboard: agent activity map', 'Dashboard attention', 'Mismatch'])
   })

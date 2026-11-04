@@ -282,7 +282,7 @@ export const content = {
       { title: 'Merchant dashboard', to: '/dashboard', note: 'The demo sign-in is pre-filled for Northwind Outfitters: one tap, no password.' },
     ],
     repoLabel: 'Source code on GitHub',
-    repoUrl: 'https://github.com/snehatiwari029/AgentReceipt',
+    repoUrl: 'https://github.com/snehatiwari029/AgentProceed',
     tryTitle: 'What to try',
     trySteps: [
       { title: 'Chat', text: 'Open the chat, tap "Try the demo test sequence" and send it. Muse finds a snowboard and places the order.' },
