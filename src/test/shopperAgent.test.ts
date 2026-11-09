@@ -229,6 +229,16 @@ describe('shopper-agent: the order reply is the confirmation', () => {
     expect(Object.values(m.tables).every((t) => t.length === 0)).toBe(true)
   })
 
+  it.each(['null', 'none', 'N/A', 'not specified'])('asks for the payment when the model sends "%s" as the payment, and writes nothing (test order 15005)', async (said) => {
+    const m = memoryStore()
+    const { r: first } = await firstTurn(m)
+    const script = fakeModel([() => call('place_order', { product_id: BURTON, payment_method: said, why: 'x' })])
+    const r = await asOk(handle({ messages: [{ role: 'user', text: HERO }, { role: 'user', text: "I'll take the Burton." }], draft: first.draft, offers: first.offers }, deps(script.model, m.store)), 'message')
+    expect(r.text).toBe('Which payment should I use for this demo checkout? No real charge will be made.')
+    expect(r.ask_payment).toBe(true)
+    expect(Object.values(m.tables).every((t) => t.length === 0)).toBe(true)
+  })
+
   it.each([
     ['Demo Visa card ••4242', 'Demo Visa card ••4242'],
     ['Mastercard', 'Mastercard'],

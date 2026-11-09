@@ -646,7 +646,7 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
       const offer = req.offers.find((o) => o.product_id === pid)
       const p = byId.get(pid)
       if (!offer || !p) return { result: { error: 'The customer has not been shown that option yet. Propose it first.' } }
-      const pay = clean(args.payment_method, 40)
+      const pay = cleanOpt(args.payment_method, 40)
       // No payment named yet: the server asks once, in fixed words, and the phone shows the payment buttons.
       if (!pay) return { result: { ok: true, asked_customer_for_payment: true }, done: { type: 'message', text: ASK_PAYMENT, ask_payment: true } }
       const payDetail = paymentDetail(pay)
