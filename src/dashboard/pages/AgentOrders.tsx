@@ -8,6 +8,7 @@ import { Card, Empty, Live, PageTitle } from '../components/Panel'
 import { DecisionBadge } from '../components/Badges'
 import VerdictTable from '../components/VerdictTable'
 import MerchantActions from '../components/MerchantActions'
+import PaymentRecord from '../components/PaymentRecord'
 
 type Session = {
   id: string
@@ -246,6 +247,7 @@ export default function AgentOrders() {
                         <p className="mb-3 text-sm text-dash-violation">Why the record is not trusted: {suspicion(r).join('; ')}.</p>
                       )}
                       <VerdictTable rows={withProductName(r.mismatch_results, r.terms_snapshot)} />
+                      <PaymentRecord grantId={r.grant_id} />
                       {r.missing_components.length > 0 && (
                         <p className="mt-3 text-sm text-dash-attention">
                           Missing record components: {r.missing_components.join(', ')}.

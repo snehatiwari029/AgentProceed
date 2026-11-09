@@ -21,7 +21,22 @@ export type OrderData = {
   total_cents: number
   delivery_label: string
   payment_label: string
+  // Present only when the order is paid through PayPal Sandbox (test money).
+  pay?: { provider: 'paypal'; environment: 'sandbox' }
 }
+
+// Where the PayPal Sandbox payment for this order stands, as the shopper-agent function reports it.
+export type PaymentState =
+  | { status: 'idle' }
+  | { status: 'working' }
+  | { status: 'approval_needed'; approve_url: string }
+  | { status: 'captured'; capture_id: string | null; paypal_order_id: string | null }
+  | { status: 'failed'; message: string }
+  | { status: 'cancelled'; message: string }
+
+export type PaymentReply =
+  | { type: 'payment'; session_id: string; status: 'approval_needed' | 'captured' | 'failed' | 'cancelled'; approve_url?: string; paypal_order_id?: string; capture_id?: string; amount_cents?: number; message?: string }
+  | { type: 'error'; message: string }
 
 // Tap-to-send prompts Muse offers (e.g. the two demo orders after an off-topic message).
 export type Suggestion = { label: string; text: string }

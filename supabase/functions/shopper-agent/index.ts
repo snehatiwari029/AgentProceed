@@ -3,7 +3,8 @@
 // publishable key (which is not a JWT). Abuse limits live in agent.ts (message count, length, model turns).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { respond, type Deps } from './agent.ts'
-import { createStore } from './store.ts'
+import { createPaymentStore, createStore } from './store.ts'
+import { createPayPalClient } from './paypal.ts'
 import { MISSING_KEY_MESSAGE, ModelCallError, ModelKeyMissingError, createMetaClient } from './model.ts'
 
 const cors = {
@@ -16,6 +17,9 @@ const json = (body: unknown, status = 200) =>
 
 // Supabase's edge runtime keeps a background promise alive after the response is sent.
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
+// The public site the shopper returns to after approving on PayPal. Fixed here, never taken from the request.
+const DEFAULT_SITE_URL = 'https://agent-receipt-mu.vercel.app'
+
 const inBackground = (p: Promise<unknown>) => {
   try { if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(p) } catch { /* the promise still runs */ }
 }
@@ -46,7 +50,16 @@ Deno.serve(async (req) => {
     if (!url || !serviceKey) return json({ type: 'error', message: 'Server is missing its Supabase settings.' }, 500)
     const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
+    // PayPal Sandbox (test money only) is switched on by its two edge-function secrets. Without them, PayPal stays a
+    // simulated demo checkout like every other payment.
+    const paypalId = Deno.env.get('PAYPAL_CLIENT_ID')
+    const paypalSecret = Deno.env.get('PAYPAL_SECRET')
+    const paypal = paypalId && paypalSecret
+      ? { client: createPayPalClient(paypalId, paypalSecret), store: createPaymentStore(db), siteUrl: Deno.env.get('SITE_URL') ?? DEFAULT_SITE_URL, newId: () => crypto.randomUUID() }
+      : undefined
+
     const deps: Deps = {
+      paypal,
       model, store: createStore(db), now: () => new Date(), demoDate: Deno.env.get('DEMO_DATE') ?? null,
       newId: () => crypto.randomUUID(),
       // Tell the order system an order arrived (session id only). The reply is never read, and the customer's

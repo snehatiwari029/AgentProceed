@@ -133,6 +133,12 @@ describe('shopper-agent: first reply', () => {
     expect([r.draft!.size_min_cm, r.draft!.size_max_cm]).toEqual([150, 165])
   })
 
+  it('drops quote marks the model puts around a rule (test order 15004 stored "snowboard" with its quotes)', () => {
+    const r = rulesFromModel({ ...heroArgs, product_scope: '"snowboard"', colour_preference: '\u201CSerpent\u201D' }, '2026-10-26')
+    expect(r.product_scope).toBe('snowboard')
+    expect(r.colour_preference).toBe('Serpent')
+  })
+
   it('refuses to propose before the rules are recorded', async () => {
     const m = memoryStore()
     const script = fakeModel([() => bothOffers(), () => ({ content: 'What are you shopping for?' })])

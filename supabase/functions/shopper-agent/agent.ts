@@ -2,6 +2,8 @@
 // it with a fake model. It only ever sees the store's product summaries, never the store's fine print or any merchant-side data.
 import { canonicalJson, sha256Hex } from './hash.ts'
 import type { ChatMessage, ModelClient, ToolDef } from './model.ts'
+import { PAYPAL_LABEL, PAYPAL_RAIL } from './paypal.ts'
+import { cancelPayPal, capturePayPal, startPayPal, type PayPalDeps, type PaymentReply } from './payment.ts'
 
 export const AGENT_ID = 'meta-muse-j0376672'
 export const MERCHANT_NAME = 'Northwind Outfitters'
@@ -83,6 +85,8 @@ export type OrderView = {
   total_cents: number
   delivery_label: string
   payment_label: string
+  // Set only when the order is paid through PayPal Sandbox: the phone then shows the PayPal button.
+  pay?: { provider: 'paypal'; environment: 'sandbox' }
 }
 
 export type Suggestion = { label: string; text: string }
@@ -131,6 +135,8 @@ export type Deps = {
   onStep?: (text: string) => void
   // Asks the order system for this session's order number (null until it has one). The brain sees only the number.
   orderNumber?: (sessionId: string) => Promise<string | null>
+  // PayPal Sandbox, when PAYPAL_CLIENT_ID and PAYPAL_SECRET are set. Without it every payment stays a simulated demo checkout.
+  paypal?: PayPalDeps
 }
 
 // ---------- small helpers ----------
@@ -174,7 +180,8 @@ function calendar(from: string): string {
 
 const clean = (v: unknown, max: number): string | null => {
   if (typeof v !== 'string') return null
-  const s = v.replace(/\s+/g, ' ').trim()
+  // A model sometimes wraps a value in quote marks ("snowboard"). The quotes are never part of what the customer said.
+  const s = v.replace(/\s+/g, ' ').trim().replace(/^["'`\u2018\u2019\u201C\u201D]+|["'`\u2018\u2019\u201C\u201D]+$/g, '').trim()
   return s ? s.slice(0, max) : null
 }
 
@@ -304,7 +311,7 @@ const TOOLS: ToolDef[] = [
           colour_preference: { type: ['string', 'null'] },
           delivery_by: { type: ['string', 'null'], description: 'Exact date YYYY-MM-DD the customer needs it by.' },
           return_policy_required: { type: ['boolean', 'null'], description: 'true only if the customer said it must be returnable; otherwise null.' },
-          product_scope: { type: ['string', 'null'], description: 'What they want, e.g. "snowboard".' },
+          product_scope: { type: ['string', 'null'], description: 'What they want, as a plain word with no quote marks, e.g. snowboard.' },
           why,
         },
         required: ['budget_max_dollars', 'size_min_cm', 'size_max_cm', 'colour_preference', 'delivery_by', 'return_policy_required', 'product_scope', 'why'],
@@ -476,7 +483,7 @@ async function runLoop(
 }
 
 // ---------- one conversation turn ----------
-async function openSession(deps: Deps, req: AgentRequest, rules: Rules, payDetail: string) {
+async function openSession(deps: Deps, req: AgentRequest, rules: Rules, payDetail: string, rail: string | null = null) {
   const { store } = deps
   const sessionId = deps.newId()
   const merchant = await store.merchantId()
@@ -501,12 +508,13 @@ async function openSession(deps: Deps, req: AgentRequest, rules: Rules, payDetai
     product_scope: rules.product_scope, size_min_cm: rules.size_min_cm, size_max_cm: rules.size_max_cm,
     colour_preference: rules.colour_preference, currency: 'USD',
     amount_max_cents: rules.budget_max_cents, budget_limit_cents: rules.budget_max_cents,
-    payment_method_ref: PAYMENT_REF, payment_method_detail: payDetail, payment_simulated: true,
+    payment_method_ref: PAYMENT_REF, payment_method_detail: payDetail, payment_simulated: !rail,
+    ...(rail ? { payment_rail: rail } : {}),
     shipping_method: null, shipping_max_cost_cents: null,
     delivery_by: rules.delivery_by, return_policy_required: rules.return_policy_required, confirmed_at, expires_at,
   }
   const grantId = deps.newId()
-  const { payment_method_detail: _detail, payment_simulated: _simulated, ...columns } = sealed
+  const { payment_method_detail: _detail, payment_simulated: _simulated, payment_rail: _rail, ...columns } = sealed as typeof sealed & { payment_rail?: string }
   await store.addGrant({
     id: grantId, session_id: sessionId, version: 1, supersedes_grant_id: null, ...columns,
     private_chat_hash, grant_json: JSON.parse(canonicalJson(sealed)),
@@ -524,8 +532,12 @@ const emptyRules = (): Rules => finishRules({
 })
 
 // The function's entry point: an order-number request, or a chat turn.
-export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | OrderStatusReply> {
-  if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).action === 'order_status') return orderStatus(raw as Record<string, unknown>, deps)
+export async function respond(raw: unknown, deps: Deps): Promise<AgentReply | OrderStatusReply | PaymentReply> {
+  const action = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).action : undefined
+  if (action === 'order_status') return orderStatus(raw as Record<string, unknown>, deps)
+  if (action === 'paypal_start') return startPayPal(raw as Record<string, unknown>, deps.paypal)
+  if (action === 'paypal_capture') return capturePayPal(raw as Record<string, unknown>, deps.paypal)
+  if (action === 'paypal_cancel') return cancelPayPal(raw as Record<string, unknown>, deps.paypal)
   return handle(raw, deps)
 }
 
@@ -638,11 +650,13 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
       // No payment named yet: the server asks once, in fixed words, and the phone shows the payment buttons.
       if (!pay) return { result: { ok: true, asked_customer_for_payment: true }, done: { type: 'message', text: ASK_PAYMENT, ask_payment: true } }
       const payDetail = paymentDetail(pay)
-      const payLabel = paymentLabel(payDetail)
+      // PayPal is paid for real in PayPal Sandbox (test money) when the server has Sandbox keys; everything else stays simulated.
+      const rail = deps.paypal && payDetail === 'PayPal' ? PAYPAL_RAIL : null
+      const payLabel = rail ? PAYPAL_LABEL : paymentLabel(payDetail)
       const pd = priceAndDelivery(p, offer.shipping_method, t)
       if (!pd) return { result: { error: 'That shipping method is not available.' } }
 
-      const { sessionId, grantId } = await openSession(deps, req, { ...(ctx.rules ?? emptyRules()) }, payDetail)
+      const { sessionId, grantId } = await openSession(deps, req, { ...(ctx.rules ?? emptyRules()) }, payDetail, rail)
       const confirmed_at = deps.now().toISOString()
       const proposalId = deps.newId()
       await store.addProposal({
@@ -654,7 +668,8 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
         product_id: p.id, product_name: p.name, brand: p.brand, size_cm: p.size_cm, colour: p.colour,
         item_price_cents: p.price_cents, shipping_method: offer.shipping_method, shipping_cents: pd.shipping_cents,
         total_cents: pd.total_cents, delivery_date: pd.delivery_date, sealed_at: deps.now().toISOString(),
-        payment_method: PAYMENT_REF, payment_method_detail: payDetail, payment_simulated: true,
+        payment_method: PAYMENT_REF, payment_method_detail: payDetail, payment_simulated: !rail,
+        ...(rail ? { payment_rail: rail, payment_status: 'awaiting_approval' } : {}),
         agent_summary: { returns: offer.summary },
       }
       const seq = await store.addAction(grantId, 'checkout', detail, { returns: offer.summary })
@@ -666,6 +681,7 @@ export async function handle(raw: unknown, deps: Deps): Promise<AgentReply> {
         product_name: p.name, brand: p.brand, size_cm: p.size_cm, colour: p.colour, item_price_cents: p.price_cents,
         shipping_label: offer.shipping_method === 'expedited' ? 'Expedited shipping' : 'Standard shipping',
         shipping_cents: pd.shipping_cents, total_cents: pd.total_cents, delivery_label: pd.delivery_label, payment_label: payLabel,
+        ...(rail ? { pay: { provider: 'paypal' as const, environment: 'sandbox' as const } } : {}),
       }
       return { result: { ok: true, placed: true }, done: { type: 'ordered', text: 'Order received.', order, session_id: sessionId } }
     }

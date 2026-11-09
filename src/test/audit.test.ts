@@ -120,6 +120,15 @@ describe('detection engine: Pass / Review Required / Hold for Suspicion', () => 
     expect(r.problem_fields).toEqual(['Product', 'Size', 'Merchant'])
   })
 
+  it('Product: quote marks, case and a plural are not a mismatch (test order 15004)', () => {
+    for (const scope of ['"snowboard"', 'Snowboard', ' snowboards ', '\u201Csnowboard\u201D']) {
+      const r = audit(input({ grant: grant({ product_scope: scope }), action: orca(), terms: freeReturns }))
+      expect(result(r, 'Product').result, scope).toBe('match')
+    }
+    const ski = audit(input({ grant: grant({ product_scope: '"ski"' }), action: orca(), terms: freeReturns }))
+    expect(result(ski, 'Product').result).toBe('mismatch')
+  })
+
   it('Size: no range in the grant means no check', () => {
     const r = audit(input({ grant: grant({ size_min_cm: null, size_max_cm: null }), terms: freeReturns, action: orca({ size_cm: 200 }) }))
     expect(result(r, 'Size').result).toBe('unspecified')

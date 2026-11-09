@@ -6,18 +6,20 @@ AI agents are becoming the new shoppers. Payment networks and banks have built s
 
 **Live demo:** https://agent-receipt-mu.vercel.app
 **Demo video:** https://youtu.be/5V1rFohJAJs
-**Built for:** Meta Global AI Developer Hackathon (submission November 4, 2026)
+**Built for:** Meta Global AI Developer Hackathon (submission November 4, 2026), then extended with a PayPal Sandbox checkout for the PayPal AI Hackathon (November 2026)
+**License:** MIT (see `LICENSE`)
 
 ## Try it in two minutes
 
 1. Open the demo store at `/shop` (Northwind Outfitters, 9 products read live from Supabase).
 2. Talk to the shopper agent at `/chat`: ask for a product the way a customer would, and watch the agent restate the request, offer options, and place the order. Each "Muse is checking" step appears as it happens, and the confirmation shows the order number so a tester can find the order in the dashboard. Type anything that is not about shopping and the chat offers two ready-made orders instead: one that passes and one that is held for review.
-3. Or call the public agent API directly: register an agent, open a session, record a grant, and place an order.
-4. Sign in to the merchant dashboard with the pre-filled demo sign-in (Northwind Outfitters). A guided tour walks through each tool.
-5. On the Dashboard home, the Agent Activity map shows each agent session at its pipeline stage, with bot icons and verdict badges.
-6. Open Agent Receipt: every agentic order carries a decision (Pass, Review required, or Hold for suspicion) and a hash-sealed receipt showing exactly what was granted and whether the action matched it.
-7. Open Agent Optimize: the five-factor listing alerts on the left, and on the right press Read as Agent Scan to see what a blind shopping agent gets wrong about each listing.
-8. Open Agent Dispute: see the evidence packet for a disputed agent order, built for its processor.
+3. Say you'll pay with PayPal. The order card shows **Pay with PayPal**: it opens PayPal Sandbox, you approve with the Sandbox test buyer (login in the Devpost testing instructions), and you come back to the chat with the payment captured and its PayPal transaction id. Test money only.
+4. Or call the public agent API directly: register an agent, open a session, record a grant, and place an order.
+5. Sign in to the merchant dashboard with the pre-filled demo sign-in (Northwind Outfitters). A guided tour walks through each tool.
+6. On the Dashboard home, the Agent Activity map shows each agent session at its pipeline stage, with bot icons and verdict badges.
+7. Open Agent Receipt: every agentic order carries a decision (Pass, Review required, or Hold for suspicion) and a hash-sealed receipt showing exactly what was granted and whether the action matched it. A PayPal order also shows its PayPal Sandbox payment record: the PayPal order id, the transaction id, and each result's hash.
+8. Open Agent Optimize: the five-factor listing alerts on the left, and on the right press Read as Agent Scan to see what a blind shopping agent gets wrong about each listing.
+9. Open Agent Dispute: see the evidence packet for a disputed agent order, built for its processor.
 
 ## What it does
 
@@ -62,6 +64,17 @@ The Dashboard home includes a live store map of agent activity (full page at `/d
 - Scoping is honest: activity queries are filtered to the demo merchant (Northwind Outfitters) in the query itself. There are no row-level security policies restricting these tables per merchant, and the submission does not claim otherwise.
 - The map shows pipeline stage, not live browsing. The public API records only agent registration, session opening, grant, and order action. There are no browsing, page-view, or cart events anywhere in the API or data model.
 
+### 5. Pay with PayPal, and keep the payment on the record: PayPal Sandbox checkout
+
+The shopper agent places the order; the shopper still approves the money themselves, on PayPal.
+
+- When the customer says they'll pay with PayPal, the order is recorded as a PayPal Sandbox order waiting for approval, and the phone shows **Pay with PayPal**.
+- The server creates a PayPal Orders v2 order (intent CAPTURE) for the total it recorded on the order. The amount never comes from the phone or the model.
+- The shopper approves on PayPal Sandbox and is sent back to `/chat`, where the server captures that order, and only the order this chat created.
+- Every PayPal result (order created, captured, capture failed, cancelled) is appended to the same SHA-256 hash chain as a `payment_events` record, with the PayPal order id and transaction id. The merchant sees it inside the order's check in Agent Receipt.
+- A captured payment never changes the order's decision: an order that does not match the grant is still Review required after PayPal says it is paid. A failed or cancelled payment is never shown as paid.
+- Idempotent: the same chat always sends PayPal the same request id, so a second tap or a page reload never creates a second order or a second capture.
+
 ## Built with Meta AI
 
 Two Meta models, used where each earns its place. No other Meta model is claimed.
@@ -90,7 +103,9 @@ Two Meta models, used where each earns its place. No other Meta model is claimed
 | `/shop` | Northwind Outfitters demo store, as a shopper or an agent sees it. 9 products read live from Supabase | Light retail |
 | `/dashboard` | Merchant dashboard: demo sign-in, then Dashboard (with the Agent Activity map), Agent Receipt, Agent Dispute, Agent Optimize, and a guided tour | Dark |
 
-**Backend.** Supabase (Postgres, Storage, edge functions). Edge functions: `shopper-agent` (Muse Spark tool-calling loop behind `/chat`), `auditor` (checks each order and writes its hash-chained receipt), `order-status` (read-only: session in, order number out), `api` (the public agent API), `optimizer`, `disputes`. Migrations live in `supabase/` in order (schema, products, storage bucket, read policies, sessions, agent API keys, optimizer, dispute agent, demo seed).
+**Backend.** Supabase (Postgres, Storage, edge functions). Edge functions: `shopper-agent` (Muse Spark tool-calling loop behind `/chat`, plus the PayPal Sandbox create and capture calls), `auditor` (checks each order and writes its hash-chained receipt), `order-status` (read-only: session in, order number out), `api` (the public agent API), `optimizer`, `disputes`. Migrations live in `supabase/` in order (schema, products, storage bucket, read policies, sessions, agent API keys, optimizer, dispute agent, demo seed).
+
+**PayPal Sandbox.** Plain REST calls from the `shopper-agent` edge function (`supabase/functions/shopper-agent/paypal.ts`): OAuth client credentials, then `POST /v2/checkout/orders` and `POST /v2/checkout/orders/{id}/capture` on `https://api-m.sandbox.paypal.com`, with a `PayPal-Request-Id` on every call. The base URL is fixed to Sandbox, so this build cannot reach live PayPal. The client id and secret exist only as Supabase edge-function secrets. The browser never sees them and never talks to the PayPal API; it only follows the approval link the server returns, after checking it is an https paypal.com link.
 
 **Public agent API.** `POST /agents/register`, `POST /sessions`, `POST /grants`, `POST /actions`. Demo API keys are hashed. Dashboard access is read-only; writes stay blocked.
 
@@ -102,11 +117,11 @@ Two Meta models, used where each earns its place. No other Meta model is claimed
 
 **Separation rules, enforced by tests.** The shop and the dashboard never import each other; anything both need goes through `shared`. Shop source never mentions dashboard, grant, receipt, tamper, or dispute, and uses no dashboard colors. No Lovable code and no external repo links in app source.
 
-**Tests.** Automated suite with Vitest (`npm test`), covering the auditor, the optimizer, the dispute packs, the activity positions, and the separation rules. Build is typechecked (`tsc --noEmit && vite build`).
+**Tests.** Automated suite with Vitest (`npm test`), covering the auditor, the optimizer, the dispute packs, the activity positions, the PayPal Sandbox checkout (with PayPal stubbed), and the separation rules. Build is typechecked (`tsc --noEmit && vite build`).
 
 ## What is real, and what is demo
 
-- Checkout is simulated. No real payments move.
+- PayPal is a real PayPal Sandbox payment: a real PayPal order, approval and capture, in test money. No real money moves. Every other payment method stays simulated and says so on the order card.
 - The shopper agent loop and grant extraction are a demo simulation. The verification layer (receipts, optimizer, read-test, dispute packs, activity map) reads real stored records.
 - Map traffic is simulated agent traffic for the demo merchant only, labeled as such on the page.
 - The off-topic check in `/chat` is a fixed word list, not a model: a message with no shopping, ski or snowboard words gets the demo-orders reply.
@@ -123,13 +138,21 @@ npm run build    # tsc --noEmit && vite build
 npm run test     # vitest run
 ```
 
-Supabase setup follows the migrations in `supabase/` in order. Edge functions need `MODEL_API_KEY` in Supabase Edge Functions Secrets (the Meta Model API key). The optimizer also needs `STORE_PAGE_URL` (the shop page whose served HTML is checked for Schema.org markup). If `MODEL_API_KEY` is missing, the shopper agent answers that it is not set.
+Supabase setup follows the migrations in `supabase/` in order (through `015_paypal_sandbox.sql`). Edge functions need `MODEL_API_KEY` in Supabase Edge Functions Secrets (the Meta Model API key). The optimizer also needs `STORE_PAGE_URL` (the shop page whose served HTML is checked for Schema.org markup). If `MODEL_API_KEY` is missing, the shopper agent answers that it is not set.
+
+To turn on PayPal Sandbox:
+
+1. In developer.paypal.com, open a Sandbox app (Apps & Credentials, Sandbox) and copy its client ID and secret. Note a Sandbox personal (buyer) account to pay with.
+2. In Supabase, Edge Functions, Secrets, set `PAYPAL_CLIENT_ID` and `PAYPAL_SECRET`. Optionally set `SITE_URL` to the site PayPal should send the shopper back to (default `https://agent-receipt-mu.vercel.app`).
+3. Run `supabase/015_paypal_sandbox.sql` once in the SQL Editor, then redeploy `shopper-agent`.
+
+Without both PayPal secrets, PayPal orders stay simulated exactly as before.
 
 ## Why this matters
 
 Merchants do not hold back from agentic commerce because they doubt agents. They hold back because every agent order is a small gamble: did it buy the right variant, at the right price, under the right returns terms, and can the merchant prove it when the dispute arrives? Agent Proceed turns that gamble into a record. Discoverable listings bring agent traffic in. Verified receipts keep that traffic profitable. Evidence packets keep it defensible. The result is adoption merchants can say yes to: discoverable by agents, protected from intent mismatches, and prepared for disputes.
 
-## Judging criteria
+## Judging criteria (Meta hackathon)
 
 - **Impact (30%):** a real adoption blocker for every merchant facing agentic commerce, solved with a working product, not a concept.
 - **Use of Meta AI Tooling (25%):** Muse Spark in five distinct product calls where the model reads and code decides, plus Muse Image as a build-time asset. Creative use beyond a basic integration: blind read-testing, multilingual comparison by meaning, and a pipeline-stage activity map.

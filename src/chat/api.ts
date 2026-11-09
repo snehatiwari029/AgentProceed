@@ -1,4 +1,4 @@
-import type { AgentReply } from './types'
+import type { AgentReply, PaymentReply } from './types'
 
 // The phone screen talks to one place: the shopper-agent function. It sends the typed words and shows the answer.
 export type AgentRequestBody = {
@@ -58,6 +58,40 @@ export async function askAgent(body: AgentRequestBody, onStep?: (line: string) =
     return { type: 'error', message: 'Muse could not answer just now. Please try again.' }
   } catch {
     return { type: 'error', message: 'Could not reach Muse. Check your connection and try again.' }
+  }
+}
+
+// The PayPal Sandbox step for this chat's own order: start (get the approval link), capture after approval, or cancel.
+// The amount is never sent: the function charges the total it recorded for the order.
+export async function payPal(
+  action: 'paypal_start' | 'paypal_capture' | 'paypal_cancel',
+  sessionId: string,
+  paypalOrderId?: string,
+): Promise<PaymentReply> {
+  const ep = endpoint()
+  if (!ep) return { type: 'error', message: 'This screen is not connected yet.' }
+  try {
+    const res = await fetch(ep.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: ep.key },
+      body: JSON.stringify({ action, session_id: sessionId, ...(paypalOrderId ? { paypal_order_id: paypalOrderId } : {}) }),
+    })
+    const json = (await res.json().catch(() => null)) as PaymentReply | null
+    if (json && (json.type === 'payment' || json.type === 'error')) return json
+    return { type: 'error', message: 'PayPal Sandbox could not be reached. Please try again.' }
+  } catch {
+    return { type: 'error', message: 'Could not reach the store. Check your connection and try again.' }
+  }
+}
+
+// Only a PayPal page is ever opened from the phone.
+export function isPayPalLink(u: unknown): u is string {
+  if (typeof u !== 'string') return false
+  try {
+    const url = new URL(u)
+    return url.protocol === 'https:' && (url.hostname === 'paypal.com' || url.hostname.endsWith('.paypal.com'))
+  } catch {
+    return false
   }
 }
 

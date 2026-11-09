@@ -181,6 +181,14 @@ function check(
 const unspecified = (key: string, field: string, terms: string | null, actual: string | null, cited: string[]) =>
   check(key, field, 'unspecified', { grant: null, terms, actual }, cited)
 
+// The grant's product word and the item's category are compared as words: case, quote marks, spacing and a plural
+// "s" are not differences ("Snowboards" and "\"snowboard\"" both cover a snowboard). A different word is still a mismatch.
+export function productWord(v: string): string {
+  const w = v.toLowerCase().replace(/["'`\u2018\u2019\u201C\u201D]/g, '').replace(/\s+/g, ' ').trim()
+  return w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w
+}
+const sameProduct = (category: string, scope: string) => productWord(category) === productWord(scope)
+
 export function audit(input: AuditInput): AuditResult {
   const { grant, action, terms } = input
 
@@ -216,7 +224,7 @@ export function audit(input: AuditInput): AuditResult {
     else if (!a.product_category) {
       missing.push('action product')
       checks.push(check('product', 'Product', 'missing', { grant: g.product_scope, terms: null, actual: null }, ['product_scope']))
-    } else if (a.product_category.toLowerCase() === g.product_scope.toLowerCase()) {
+    } else if (sameProduct(a.product_category, g.product_scope)) {
       checks.push(check('product', 'Product', 'match', { grant: g.product_scope, terms: a.product_category, actual: a.product_category }, ['product_scope']))
     } else {
       checks.push(check('product', 'Product', 'mismatch', { grant: g.product_scope, terms: a.product_category, actual: a.product_category }, ['product_scope'], {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { askAgent, orderNumber } from './api'
+import { askAgent, isPayPalLink, orderNumber, payPal } from './api'
 import PhoneFrame from './PhoneFrame'
-import { Bubble, OfferCard, OrderCard, StatusLine } from './Cards'
-import type { AgentReply, ChatItem, OfferCardData } from './types'
+import { Bubble, OfferCard, OrderCard, PayPalStatus, StatusLine } from './Cards'
+import type { AgentReply, ChatItem, OfferCardData, PaymentReply, PaymentState } from './types'
 
 // Payment choices shown once, when Muse asks. Visa and Mastercard are card networks; Stripe Checkout and PayPal are checkout methods.
 const PAYMENTS: { label: string; suggested?: boolean }[] = [
@@ -11,6 +11,39 @@ const PAYMENTS: { label: string; suggested?: boolean }[] = [
   { label: 'Stripe Checkout' },
   { label: 'PayPal' },
 ]
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PAYPAL_TOKEN = /^[A-Z0-9]{8,32}$/
+// The chat is kept in this tab while the shopper is on PayPal, so it can be shown again on the way back.
+const saved = (sessionId: string) => `agentproceed-chat-${sessionId}`
+
+// Reads ?paypal=return|cancel&session=...&token=... once, when PayPal sends the shopper back to /chat.
+function paypalReturn(): { state: 'return' | 'cancel'; session: string; token: string | null; items: ChatItem[] | null } | null {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    const state = q.get('paypal')
+    const session = q.get('session') ?? ''
+    if ((state !== 'return' && state !== 'cancel') || !UUID.test(session)) return null
+    const token = q.get('token')
+    let items: ChatItem[] | null = null
+    try {
+      const raw = window.sessionStorage.getItem(saved(session))
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null
+      if (Array.isArray(parsed)) items = parsed as ChatItem[]
+    } catch { /* storage unavailable: the order card is shown without the chat */ }
+    return { state, session, token: token && PAYPAL_TOKEN.test(token) ? token : null, items }
+  } catch {
+    return null
+  }
+}
+
+const toPayment = (r: PaymentReply): PaymentState => {
+  if (r.type === 'error') return { status: 'failed', message: r.message }
+  if (r.status === 'captured') return { status: 'captured', capture_id: r.capture_id ?? null, paypal_order_id: r.paypal_order_id ?? null }
+  if (r.status === 'approval_needed' && isPayPalLink(r.approve_url)) return { status: 'approval_needed', approve_url: r.approve_url }
+  if (r.status === 'cancelled') return { status: 'cancelled', message: r.message ?? 'PayPal payment cancelled.' }
+  return { status: 'failed', message: r.message ?? 'PayPal Sandbox could not complete the payment.' }
+}
+
 const HELLO = "Hi, I'm Muse. Tell me what you're looking for at Northwind Outfitters."
 const DEMO_PROMPT =
   "Find and purchase a less than $500 snowboard that will arrive at my address in 2 days. I should be able to return it if it doesn't work for me."
@@ -29,6 +62,7 @@ export default function ChatApp() {
   const [live, setLive] = useState<string[]>([])
   // The order number: 'pending' while the store assigns it, 'late' if it has not arrived after a while.
   const [number, setNumber] = useState<string | 'pending' | 'late' | null>(null)
+  const [payment, setPayment] = useState<PaymentState>({ status: 'idle' })
   const next = useRef(1)
   const end = useRef<HTMLDivElement>(null)
 
@@ -76,6 +110,41 @@ export default function ChatApp() {
       window.setTimeout(tick, 1500)
     }
     window.setTimeout(tick, 1000)
+  }
+
+  // Back from PayPal: show the order again and finish (or record the cancel of) the Sandbox payment.
+  const returned = useRef(false)
+  useEffect(() => {
+    if (returned.current) return
+    returned.current = true
+    const back = paypalReturn()
+    if (!back) return
+    try { window.history.replaceState(null, '', '/chat') } catch { /* address bar keeps the PayPal query */ }
+    if (back.items) {
+      setItems(back.items)
+      next.current = Math.max(1, ...back.items.map((i) => i.id + 1))
+    }
+    setSessionId(back.session)
+    setOrdered(true)
+    followOrder(back.session)
+    setPayment({ status: 'working' })
+    const done = back.state === 'return' && back.token
+      ? payPal('paypal_capture', back.session, back.token)
+      : payPal('paypal_cancel', back.session)
+    void done.then((r) => { if (alive.current) setPayment(toPayment(r)) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function payWithPayPal() {
+    if (!sessionId || payment.status === 'working' || payment.status === 'captured') return
+    setPayment({ status: 'working' })
+    const next = toPayment(await payPal('paypal_start', sessionId))
+    if (next.status === 'approval_needed') {
+      try { window.sessionStorage.setItem(saved(sessionId), JSON.stringify(items)) } catch { /* the order card still comes back */ }
+      window.location.assign(next.approve_url)
+      return
+    }
+    setPayment(next)
   }
 
   async function send(raw: string) {
@@ -156,7 +225,7 @@ export default function ChatApp() {
                 {i.offers.map((o) => <OfferCard key={o.product_id} offer={o} disabled={busy || ordered} onPick={() => void pick(o)} />)}
               </div>
             )
-            case 'order': return <OrderCard key={i.id} order={i.order} number={number} />
+            case 'order': return <OrderCard key={i.id} order={i.order} number={number} payment={payment} onPay={i.order.pay ? () => void payWithPayPal() : undefined} />
             case 'problem': return <p key={i.id} role="alert" className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{i.text}</p>
             case 'suggest': return (
               <div key={i.id} aria-label="Suggested orders" className="space-y-1.5">
@@ -173,6 +242,12 @@ export default function ChatApp() {
             )
           }
         })}
+        {payment.status !== 'idle' && !items.some((i) => i.kind === 'order') && (
+          <section aria-label="PayPal payment" className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3.5">
+            <h2 className="text-sm font-bold text-emerald-900">Your Northwind order</h2>
+            <PayPalStatus payment={payment} onPay={() => void payWithPayPal()} />
+          </section>
+        )}
         {busy && live.map((l, k) => <StatusLine key={`live-${k}`}>{l}</StatusLine>)}
         {busy && <StatusLine>Muse is thinking…</StatusLine>}
         <div ref={end} />

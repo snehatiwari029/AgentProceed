@@ -2,6 +2,7 @@
 // The product query lists its columns on purpose: the fine-print columns are not on the list, so the agent cannot see them.
 import { appendChained, type ChainDb } from './chain.ts'
 import { MERCHANT_NAME, type ProductRow, type Step, type Store } from './agent.ts'
+import type { PaymentEvent, PaymentStore } from './payment.ts'
 
 export const PRODUCT_COLUMNS =
   'id,name,brand,category,size_cm,colour,price_cents,currency,marketing_blurb,standard_shipping_cents,standard_delivery_days,expedited_shipping_cents,expedited_delivery_days'
@@ -59,6 +60,48 @@ export function createStore(db: Db, newId: () => string = () => crypto.randomUUI
         id: newId(), grant_id: grantId, seq, type, detail, agent_believed_terms: believed, image_evidence_ref: null,
       })
       return seq
+    },
+  }
+}
+
+// PayPal Sandbox records for one session: its own checkout total (read back from the stored checkout action, never
+// from the phone), its payment events, and new payment events appended to the hash chain.
+export function createPaymentStore(db: Db): PaymentStore {
+  const chainDb: ChainDb = {
+    async latestHash() {
+      const r = await db.from('chain_entries').select('entry_hash').order('chain_seq', { ascending: false }).limit(1)
+      const rows = must<{ entry_hash: string }[]>(r, 'read chain')
+      return rows?.[0]?.entry_hash ?? null
+    },
+    async insert(table, row) {
+      must(await db.from(table).insert(row), `insert ${table}`)
+    },
+  }
+  return {
+    async checkoutFor(sessionId) {
+      const g = must<{ id: string; currency: string | null }[]>(
+        await db.from('grants').select('id,currency').eq('session_id', sessionId).limit(1), 'read session grant')
+      const grant = g?.[0]
+      if (!grant) return null
+      const a = must<{ detail: Record<string, unknown> }[]>(
+        await db.from('actions').select('detail').eq('grant_id', grant.id).eq('type', 'checkout').order('seq', { ascending: false }).limit(1),
+        'read checkout action')
+      const detail = a?.[0]?.detail
+      const total = detail?.total_cents
+      if (!detail || typeof total !== 'number') return null
+      return {
+        grantId: grant.id, totalCents: total, currency: grant.currency ?? 'USD',
+        rail: typeof detail.payment_rail === 'string' ? detail.payment_rail : null,
+        productName: typeof detail.product_name === 'string' ? detail.product_name : null,
+      }
+    },
+    async paymentEvents(sessionId) {
+      const r = await db.from('payment_events').select('event,paypal_order_id,capture_id,status,amount_cents,currency')
+        .eq('session_id', sessionId).order('chain_seq', { ascending: true })
+      return must<PaymentEvent[]>(r, 'read payment events') ?? []
+    },
+    async addPaymentEvent(row) {
+      await appendChained(chainDb, 'payment_events', row)
     },
   }
 }

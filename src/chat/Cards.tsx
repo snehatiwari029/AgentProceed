@@ -1,5 +1,5 @@
 import { formatMoney } from '../shared/format'
-import type { OfferCardData, OrderData } from './types'
+import type { OfferCardData, OrderData, PaymentState } from './types'
 
 export function Bubble({ side, children }: { side: 'me' | 'muse'; children: string }) {
   const me = side === 'me'
@@ -32,7 +32,12 @@ export function OfferCard({ offer, onPick, disabled }: { offer: OfferCardData; o
   )
 }
 
-export function OrderCard({ order, number = null }: { order: OrderData; number?: string | 'pending' | 'late' | null }) {
+export function OrderCard({ order, number = null, payment = { status: 'idle' }, onPay }: {
+  order: OrderData
+  number?: string | 'pending' | 'late' | null
+  payment?: PaymentState
+  onPay?: () => void
+}) {
   const rows: [string, string][] = [
     ['Item', formatMoney(order.item_price_cents)],
     [order.shipping_label, order.shipping_cents === 0 ? 'Free' : formatMoney(order.shipping_cents)],
@@ -56,8 +61,35 @@ export function OrderCard({ order, number = null }: { order: OrderData; number?:
         <div className="flex justify-between border-t border-emerald-200 py-1 font-bold"><dt>Total</dt><dd>{formatMoney(order.total_cents)}</dd></div>
       </dl>
       <p className="text-sm text-neutral-700">Arrives {order.delivery_label}</p>
-      <p className="text-xs text-neutral-500">Paid with {order.payment_label}. Simulated, no real payment.</p>
+      {order.pay ? <PayPalStatus payment={payment} onPay={onPay} /> : <p className="text-xs text-neutral-500">Paid with {order.payment_label}. Simulated, no real payment.</p>}
       <p className="text-xs text-neutral-500">Northwind confirms your order before it ships.</p>
     </section>
+  )
+}
+
+// The PayPal Sandbox step on the order card. Test money only; the store charges the total shown above.
+export function PayPalStatus({ payment, onPay }: { payment: PaymentState; onPay?: () => void }) {
+  if (payment.status === 'captured') {
+    return (
+      <p className="mt-1 text-sm text-emerald-900" data-testid="paypal-status" role="status">
+        Paid with PayPal Sandbox (test money).
+        {payment.capture_id && <span className="block text-xs text-neutral-600">PayPal transaction <b className="font-mono">{payment.capture_id}</b></span>}
+      </p>
+    )
+  }
+  const note = payment.status === 'failed' || payment.status === 'cancelled' ? payment.message : null
+  return (
+    <div className="mt-2 space-y-1" data-testid="paypal-status">
+      {note && <p role="alert" className="text-xs text-amber-900">{note}</p>}
+      <button
+        type="button"
+        onClick={onPay}
+        disabled={!onPay || payment.status === 'working'}
+        className="w-full rounded-xl bg-[#ffc439] py-2 text-sm font-bold text-[#003087] disabled:opacity-60"
+      >
+        {payment.status === 'working' ? 'Opening PayPal…' : note ? 'Try PayPal again' : 'Pay with PayPal'}
+      </button>
+      <p className="text-[11px] text-neutral-500">PayPal Sandbox, test money only. Sign in with a PayPal Sandbox test buyer.</p>
+    </div>
   )
 }
