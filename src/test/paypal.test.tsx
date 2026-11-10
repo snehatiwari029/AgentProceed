@@ -365,3 +365,21 @@ describe('PayPal keys stay on the server', () => {
     for (const f of filesUnder('supabase/functions')) expect(readFileSync(f, 'utf8'), f).not.toMatch(/api-m\.paypal\.com|api\.paypal\.com/)
   })
 })
+
+describe('Payment row label on a PayPal Sandbox order (test order 15007)', () => {
+  const row = (key: string, v: string | null) => ({ field: key, key, grant: v, merchant_terms: v, actual: v, result: 'match' as const, cause: null, next_action_who: null, cited_fields: [] })
+  it('names PayPal Sandbox instead of the internal Demo Checkout reference, and changes nothing else', async () => {
+    const { withPaymentLabel, PAYPAL_PAYMENT_LABEL } = await import('../dashboard/pages/AgentOrders')
+    const rows = [row('product', 'snowboard'), row('payment', 'Demo Checkout')]
+    const out = withPaymentLabel(rows, true)
+    expect(out[1]).toEqual({ ...rows[1], grant: PAYPAL_PAYMENT_LABEL, merchant_terms: PAYPAL_PAYMENT_LABEL, actual: PAYPAL_PAYMENT_LABEL })
+    expect(out[1].result).toBe('match')
+    expect(out[0]).toBe(rows[0])
+  })
+  it('leaves a simulated Demo Checkout order as it is', async () => {
+    const { withPaymentLabel } = await import('../dashboard/pages/AgentOrders')
+    const rows = [row('payment', 'Demo Checkout')]
+    expect(withPaymentLabel(rows, false)).toBe(rows)
+    expect(withPaymentLabel(rows, undefined)).toBe(rows)
+  })
+})

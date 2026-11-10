@@ -29,6 +29,7 @@ export type OrderRow = {
   total_cents: number | null
   dispute: string | null
   decision: Decision | null
+  paypal?: boolean
 }
 
 // Orders requiring attention = Review Required + Hold for Suspicion. A dispute is not needed to be flagged.
@@ -61,6 +62,7 @@ export function buildOrders(
       total_cents: num(r.action_summary.total_cents),
       dispute: d ? disputeStatus(events.filter((e) => e.dispute_id === d.id)) : null,
       decision: r.decision,
+      paypal: g?.grant_json?.payment_rail === 'paypal_sandbox',
     }
   })
   for (const s of sessions.filter((x) => x.detection_source === 'none')) {
@@ -126,6 +128,16 @@ export function withProductName(rows: MismatchResult[], snapshot: Record<string,
     const scope = r.merchant_terms ?? r.actual
     return { ...r, actual: scope ? `${full} (${scope})` : full }
   })
+}
+
+export const PAYPAL_PAYMENT_LABEL = 'PayPal Sandbox (test money)'
+
+// Display only: an order paid through PayPal Sandbox names PayPal on its Payment row instead of the internal
+// "Demo Checkout" reference the check compares. Stored results, hashes and decisions are not touched.
+export function withPaymentLabel(rows: MismatchResult[], paypal: boolean | undefined): MismatchResult[] {
+  if (!paypal) return rows
+  const relabel = (v: string | null) => (v === 'Demo Checkout' ? PAYPAL_PAYMENT_LABEL : v)
+  return rows.map((r) => (r.key !== 'payment' ? r : { ...r, grant: relabel(r.grant), merchant_terms: relabel(r.merchant_terms), actual: relabel(r.actual) }))
 }
 
 export default function AgentOrders() {
@@ -246,7 +258,7 @@ export default function AgentOrders() {
                       {suspicion(r).length > 0 && (
                         <p className="mb-3 text-sm text-dash-violation">Why the record is not trusted: {suspicion(r).join('; ')}.</p>
                       )}
-                      <VerdictTable rows={withProductName(r.mismatch_results, r.terms_snapshot)} />
+                      <VerdictTable rows={withPaymentLabel(withProductName(r.mismatch_results, r.terms_snapshot), o.paypal)} />
                       <PaymentRecord grantId={r.grant_id} />
                       {r.missing_components.length > 0 && (
                         <p className="mt-3 text-sm text-dash-attention">
