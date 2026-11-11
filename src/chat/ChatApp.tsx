@@ -54,6 +54,8 @@ export default function ChatApp() {
   const [offers, setOffers] = useState<unknown[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [ordered, setOrdered] = useState(false)
+  // The offer the shopper picked: its button reads "Picked" and the others are disabled, so it cannot be picked twice.
+  const [picked, setPicked] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState('')
   // "Muse is checking" lines streamed while Muse works; replaced by the reply's own lines when it arrives.
@@ -73,7 +75,9 @@ export default function ChatApp() {
       i.kind === 'me' ? [{ role: 'user', text: i.text }] : i.kind === 'muse' ? [{ role: 'assistant', text: i.text }] : [])
 
   function show(reply: AgentReply, base: ChatItem[]) {
-    const add: ChatItem[] = (reply.steps ?? []).map((s) => ({ id: id(), kind: 'status', text: s }))
+    // A "Muse is checking" line already on screen is not shown again (Muse can give the same reason on a later turn).
+    const shown = new Set(base.flatMap((i) => (i.kind === 'status' ? [i.text] : [])))
+    const add: ChatItem[] = (reply.steps ?? []).filter((s) => !shown.has(s) && shown.add(s)).map((s) => ({ id: id(), kind: 'status', text: s }))
     if (reply.session_id) setSessionId(reply.session_id)
     if (reply.draft !== undefined) setDraft(reply.draft)
     setAskPay(reply.ask_payment === true)
@@ -83,12 +87,18 @@ export default function ChatApp() {
     }
     else if (reply.type === 'proposals') {
       setOffers(reply.offers)
+      setPicked(null)
       add.push({ id: id(), kind: 'muse', text: reply.text }, { id: id(), kind: 'offers', offers: reply.offers }, { id: id(), kind: 'muse', text: reply.follow_up })
     } else if (reply.type === 'ordered') {
       setOrdered(true)
       if (reply.session_id) followOrder(reply.session_id)
-      add.push({ id: id(), kind: 'muse', text: reply.text }, { id: id(), kind: 'order', order: reply.order })
-    } else add.push({ id: id(), kind: 'problem', text: reply.message })
+      // Until PayPal captures the payment the order is not paid, so the chat says so instead of "Order received".
+      const text = reply.order.pay ? 'Ready to pay. Tap Pay with PayPal to finish checkout.' : reply.text
+      add.push({ id: id(), kind: 'muse', text }, { id: id(), kind: 'order', order: reply.order })
+    } else {
+      setPicked(null)
+      add.push({ id: id(), kind: 'problem', text: reply.message })
+    }
     setItems([...base, ...add])
   }
 
@@ -160,7 +170,12 @@ export default function ChatApp() {
     show(reply, base)
   }
 
-  const pick = (o: OfferCardData) => send(`I'll take the ${o.brand ? `${o.brand} ` : ''}${o.name}.`)
+  const pick = (o: OfferCardData) => {
+    if (picked || busy || ordered) return
+    setPicked(o.product_id)
+    return send(`I'll take the ${o.brand ? `${o.brand} ` : ''}${o.name}.`)
+  }
+  const paid = payment.status === 'captured' || !items.some((i) => i.kind === 'order' && i.order.pay)
   const fresh = items.length === 1
 
   return (
@@ -202,7 +217,7 @@ export default function ChatApp() {
               onChange={(e) => setText(e.target.value)}
               maxLength={1000}
               disabled={busy || ordered}
-              placeholder={ordered ? 'Order received' : 'Message Muse'}
+              placeholder={ordered ? (paid ? 'Order received' : 'Ready to pay') : 'Message Muse'}
               className="min-w-0 flex-1 rounded-full border border-neutral-300 px-4 py-2 text-sm text-neutral-900 outline-none focus:border-indigo-500 disabled:bg-neutral-100"
             />
             <button type="submit" disabled={busy || ordered || !text.trim()} className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
@@ -220,7 +235,7 @@ export default function ChatApp() {
             case 'status': return <StatusLine key={i.id}>{i.text}</StatusLine>
             case 'offers': return (
               <div key={i.id} className="space-y-3">
-                {i.offers.map((o) => <OfferCard key={o.product_id} offer={o} disabled={busy || ordered} onPick={() => void pick(o)} />)}
+                {i.offers.map((o) => <OfferCard key={o.product_id} offer={o} picked={picked === o.product_id} disabled={busy || ordered || picked !== null} onPick={() => void pick(o)} />)}
               </div>
             )
             case 'order': return <OrderCard key={i.id} order={i.order} number={number} payment={payment} onPay={i.order.pay ? () => void payWithPayPal() : undefined} />

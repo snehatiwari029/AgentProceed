@@ -16,7 +16,7 @@ export function StatusLine({ children }: { children: string }) {
   return <p className="px-1 text-xs italic text-neutral-500">{children}</p>
 }
 
-export function OfferCard({ offer, onPick, disabled }: { offer: OfferCardData; onPick: () => void; disabled: boolean }) {
+export function OfferCard({ offer, onPick, disabled, picked = false }: { offer: OfferCardData; onPick: () => void; disabled: boolean; picked?: boolean }) {
   return (
     <section aria-label={offer.name} className="rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{offer.brand}</p>
@@ -26,7 +26,7 @@ export function OfferCard({ offer, onPick, disabled }: { offer: OfferCardData; o
       <p className="text-sm text-neutral-800">{offer.summary}</p>
       <p className="text-sm text-neutral-600">Arrives {offer.delivery_label}</p>
       <button type="button" disabled={disabled} onClick={onPick} className="mt-3 w-full rounded-xl bg-indigo-600 py-2 text-sm font-semibold text-white disabled:opacity-50">
-        Pick this one
+        {picked ? 'Picked' : 'Pick this one'}
       </button>
     </section>
   )
@@ -42,10 +42,12 @@ export function OrderCard({ order, number = null, payment = { status: 'idle' }, 
     ['Item', formatMoney(order.item_price_cents)],
     [order.shipping_label, order.shipping_cents === 0 ? 'Free' : formatMoney(order.shipping_cents)],
   ]
+  // A PayPal order is waiting on the shopper until PayPal captures the payment: it reads "Ready to pay" until then.
+  const awaitingPay = !!order.pay && payment.status !== 'captured'
   return (
     <section aria-label="Order confirmation" className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3.5">
-      <h2 className="text-sm font-bold text-emerald-900">Order received</h2>
-      {number && (
+      <h2 className="text-sm font-bold text-emerald-900">{awaitingPay ? 'Ready to pay' : 'Order received'}</h2>
+      {number && !awaitingPay && (
         <p className="mt-1 text-sm text-neutral-900" data-testid="order-number" role="status">
           {number === 'pending' ? <span className="text-neutral-600">Getting your order number…</span>
             : number === 'late' ? <span className="text-neutral-600">Your order number is still being assigned. The store has your order.</span>

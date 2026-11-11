@@ -227,4 +227,55 @@ describe('/chat phone screen', () => {
     expect(calls[1].body.messages.at(-1)).toEqual({ role: 'user', text: 'Find a returnable snowboard.' })
     expect(await screen.findByText('On it.')).toBeInTheDocument()
   })
+
+  it('after a pick, the picked card reads "Picked" and no card can be picked again', async () => {
+    const user = userEvent.setup()
+    replies = [
+      { type: 'proposals', text: 'Here are two options:', follow_up: 'Pick one.', offers, draft: {} },
+      { type: 'message', text: 'Which payment should I use for this demo checkout? No real charge will be made.', ask_payment: true },
+    ]
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), HERO)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await user.click((await screen.findAllByRole('button', { name: 'Pick this one' }))[0])
+    await screen.findByLabelText('Payment options')
+    expect(screen.getByRole('button', { name: 'Picked' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pick this one' })).toBeDisabled()
+    expect(calls).toHaveLength(2)
+  })
+
+  it('shows a "Muse is checking" line once, even when a later turn gives the same reason', async () => {
+    const user = userEvent.setup()
+    const line = 'Muse is checking: Placing your chosen snowboard order now'
+    replies = [
+      { type: 'message', text: 'Which payment?', steps: [line] },
+      { type: 'message', text: 'Done.', steps: [line, 'Muse is checking: Something new'] },
+    ]
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), 'Order the Burton')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Which payment?')
+    await user.type(screen.getByLabelText('Message Muse'), 'PayPal')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Done.')
+    expect(screen.getAllByText(line)).toHaveLength(1)
+    expect(screen.getByText('Muse is checking: Something new')).toBeInTheDocument()
+  })
+
+  it('a PayPal order reads "Ready to pay", with no order number, until PayPal captures the payment', async () => {
+    const user = userEvent.setup()
+    replies = [
+      { type: 'ordered', session_id: '00000000-0000-4000-8000-000000000001', text: 'Order received.', order: { product_name: 'Spellbinder Snowboard 2026/2027', brand: 'Burton', size_cm: 156, colour: 'Serpent', item_price_cents: 44995, shipping_label: 'Expedited shipping', shipping_cents: 6000, total_cents: 50995, delivery_label: 'Fri Oct 30', payment_label: 'PayPal Sandbox', pay: { provider: 'paypal', environment: 'sandbox' } } },
+    ]
+    render(<ChatApp />)
+    await user.type(screen.getByLabelText('Message Muse'), 'Order the Burton with PayPal')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    const card = await screen.findByLabelText('Order confirmation')
+    expect(within(card).getByRole('heading')).toHaveTextContent('Ready to pay')
+    expect(screen.getByText('Ready to pay. Tap Pay with PayPal to finish checkout.')).toBeInTheDocument()
+    expect(screen.queryByText('Order received.')).toBeNull()
+    expect(screen.getByLabelText('Message Muse')).toHaveAttribute('placeholder', 'Ready to pay')
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(screen.queryByTestId('order-number')).toBeNull()
+  })
 })
