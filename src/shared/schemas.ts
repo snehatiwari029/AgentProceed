@@ -101,6 +101,7 @@ export type Receipt = ChainFields & {
   image_evidence_ref: Record<string, unknown> | null
   schema_label: string
   sealed_at: string | null
+  created_at?: string
   decision: Decision | null
   audit: Record<string, unknown> | null
   fulfillment: Fulfillment | null

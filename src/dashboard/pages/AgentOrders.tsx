@@ -22,6 +22,8 @@ type Session = {
 export type OrderRow = {
   key: string
   order: string | null
+  // When the order was placed: the receipt's sealed time (else its write time), or when a gap session was opened.
+  placed_at: string | null
   receipt: Receipt | null
   customer: string
   agent: string
@@ -55,6 +57,7 @@ export function buildOrders(
     return {
       key: r.id,
       order: r.order_ref,
+      placed_at: r.sealed_at ?? r.created_at ?? null,
       receipt: r,
       customer: g?.shopper_ref ?? '–',
       agent: g ? `${g.agent_id}${g.agent_verified ? ' (verified, simulated)' : ''}` : '–',
@@ -70,6 +73,7 @@ export function buildOrders(
     rows.push({
       key: s.id,
       order: gap.order,
+      placed_at: s.opened_at,
       receipt: null,
       customer: '–',
       agent: 'Unknown agent (unverified)',
@@ -80,12 +84,24 @@ export function buildOrders(
       decision: 'hold_suspicion', // an unverified agent with no session or receipt: the record cannot be trusted
     })
   }
+  // Newest first: by placed time, then by order number for rows placed at the same moment or with no time.
+  const time = (o: OrderRow) => (o.placed_at ? new Date(o.placed_at).getTime() : NaN)
+  const ref = (o: OrderRow) => (o.order === null ? -Infinity : Number(o.order))
   return rows.sort((a, b) => {
-    if (a.order === null && b.order === null) return 0
-    if (a.order === null) return 1
-    if (b.order === null) return -1
-    return Number(a.order) - Number(b.order)
+    const ta = time(a), tb = time(b)
+    if (!Number.isNaN(ta) || !Number.isNaN(tb)) {
+      if (Number.isNaN(ta)) return 1
+      if (Number.isNaN(tb)) return -1
+      if (ta !== tb) return tb - ta
+    }
+    return ref(b) - ref(a)
   })
+}
+
+export const placedLabel = (iso: string | null) => {
+  if (!iso) return '–'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '–' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const suspicion = (r: Receipt): string[] => {
@@ -166,7 +182,7 @@ export default function AgentOrders() {
   return (
     <div>
       <PageTitle title="Agent orders">
-        Every order an agent placed at this store, with the receipt written for it. Open a row for the line-by-line check.
+        Every order an agent placed at this store, with the receipt written for it. Newest first. Open a row for the line-by-line check.
         The verified-agent signal is simulated.
       </PageTitle>
 
@@ -185,10 +201,11 @@ export default function AgentOrders() {
                 <span className="ml-2 font-normal text-dash-label">Review Required + Hold for Suspicion. No dispute needed.</span>
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[56rem] border-collapse text-left text-sm">
+                <table className="w-full min-w-[64rem] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-dash-edge text-xs uppercase tracking-wider text-dash-label">
                       <th className="py-2 pr-4 font-semibold">Order</th>
+                      <th className="py-2 pr-4 font-semibold">Placed</th>
                       <th className="py-2 pr-4 font-semibold">Receipt</th>
                       <th className="py-2 pr-4 font-semibold">Customer</th>
                       <th className="py-2 pr-4 font-semibold">Agent</th>
@@ -206,6 +223,9 @@ export default function AgentOrders() {
                       return (
                         <tr key={o.key} data-order-ref={o.order ?? undefined} data-chain-seq={r?.chain_seq} className="border-b border-dash-edge align-top">
                           <td className="py-2 pr-4 font-semibold text-dash-ink">{o.order ?? '–'}</td>
+                          <td className="whitespace-nowrap py-2 pr-4">
+                            {o.placed_at ? <time dateTime={o.placed_at}>{placedLabel(o.placed_at)}</time> : '–'}
+                          </td>
                           <td className="py-2 pr-4">{r?.receipt_ref ?? '–'}</td>
                           <td className="py-2 pr-4">{o.customer}</td>
                           <td className="py-2 pr-4">{o.agent}</td>
