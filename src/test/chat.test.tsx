@@ -110,8 +110,6 @@ describe('/chat phone screen', () => {
 
   it.each([
     ['Demo Visa card ••4242', 'Demo Visa card ••4242'],
-    ['Mastercard', 'Mastercard'],
-    ['Stripe Checkout', 'Stripe Checkout'],
     ['PayPal', 'PayPal'],
   ])('shows payment buttons once, and tapping "%s" places the order with matching wording', async (label, detail) => {
     const user = userEvent.setup()
@@ -125,7 +123,7 @@ describe('/chat phone screen', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }))
     const options = await screen.findByLabelText('Payment options')
     const names = Array.from(options.querySelectorAll('button')).map((b) => b.textContent)
-    expect(names).toEqual(['Demo Visa card ••4242Suggested', 'Mastercard', 'Stripe Checkout', 'PayPal'])
+    expect(names).toEqual(['Demo Visa card ••4242Suggested', 'PayPal'])
     expect(options).toHaveTextContent("Or type any other payment — I'll record it as demo checkout.")
     expect(screen.getByText(ask)).toBeInTheDocument()
     expect(screen.getByTestId('phone-frame').textContent).not.toMatch(/visa checkout|mastercard checkout/i)

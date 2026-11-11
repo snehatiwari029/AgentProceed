@@ -4,11 +4,9 @@ import PhoneFrame from './PhoneFrame'
 import { Bubble, OfferCard, OrderCard, PayPalStatus, StatusLine } from './Cards'
 import type { AgentReply, ChatItem, OfferCardData, PaymentReply, PaymentState } from './types'
 
-// Payment choices shown once, when Muse asks. Visa and Mastercard are card networks; Stripe Checkout and PayPal are checkout methods.
+// Payment choices shown once, when Muse asks: the simulated demo card, or real PayPal Sandbox checkout.
 const PAYMENTS: { label: string; suggested?: boolean }[] = [
   { label: 'Demo Visa card ••4242', suggested: true },
-  { label: 'Mastercard' },
-  { label: 'Stripe Checkout' },
   { label: 'PayPal' },
 ]
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
