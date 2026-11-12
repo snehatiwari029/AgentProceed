@@ -78,9 +78,9 @@ export default function ReceiptSeal({ receiptId, grantId, sealHash }: { receiptI
           </dd>
         </dl>
       )}
-      {sig && !('error' in sig) && (
+      {!(sig && 'error' in sig) && (
         <button type="button" className={`${BTN} mt-3`} onClick={run} disabled={busy}>
-          {busy ? 'Verifying…' : ppOrder ? 'Verify against live PayPal Sandbox' : 'Verify signature'}
+          {busy ? 'Verifying…' : ppOrder ? 'Verify against live PayPal Sandbox' : sig ? 'Verify signature' : 'Check this receipt'}
         </button>
       )}
       {result && <SealResult r={result} />}
@@ -92,16 +92,20 @@ export function SealResult({ r }: { r: Reply }) {
   if (r.type === 'error') return <p className="mt-2 text-sm font-semibold text-dash-violation" role="alert">{r.message}</p>
   if (r.type !== 'verify') return null
   const ok = r.result === 'match'
+  const unsigned = r.result === 'unsigned'
+  const tone = ok ? { box: 'border-dash-teal', text: 'text-dash-teal' } : unsigned ? { box: 'border-dash-attention', text: 'text-dash-attention' } : { box: 'border-dash-violation', text: 'text-dash-violation' }
   return (
-    <div className={`mt-3 rounded-md border p-3 text-xs ${ok ? 'border-dash-teal' : 'border-dash-violation'}`} role="status" data-testid="seal-verify-result">
-      <p className={`text-sm font-semibold ${ok ? 'text-dash-teal' : 'text-dash-violation'}`}>
-        {ok ? 'Match: the PayPal order carries this receipt\'s seal and the merchant signature verifies.' : 'Mismatch: at least one check failed.'}
+    <div className={`mt-3 rounded-md border p-3 text-xs ${tone.box}`} role="status" data-testid="seal-verify-result" data-result={r.result}>
+      <p className={`text-sm font-semibold ${tone.text}`}>
+        {ok ? 'Match: the PayPal order carries this receipt\'s seal and the merchant signature verifies.'
+          : unsigned ? `${r.message ?? 'No signature: this order predates receipt signing.'} Its receipt record still verifies.`
+            : 'Mismatch: at least one check failed.'}
       </p>
       {r.custom_id !== null && <p className="mt-1 break-all font-mono text-dash-body">Live PayPal custom_id: {r.custom_id}{r.paypal_status ? ` (order ${r.paypal_status})` : ''}</p>}
       <ul className="mt-2 space-y-1">
         {r.checks.map((c) => (
           <li key={c.key} className="break-all">
-            <span className={`font-semibold ${c.ok ? 'text-dash-teal' : 'text-dash-violation'}`}>{c.ok ? '✓' : '✗'} {c.label}</span>
+            <span className={`font-semibold ${c.ok ? 'text-dash-teal' : unsigned ? 'text-dash-attention' : 'text-dash-violation'}`}>{c.ok ? '✓' : unsigned ? '–' : '✗'} {c.label}</span>
             <span className="text-dash-label"> · {c.detail}</span>
           </li>
         ))}

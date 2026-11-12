@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeEntryHash, GENESIS_HASH } from '../../supabase/functions/receipt-seal/hash'
-import { NO_KEY, customIdFor, merchantKeyFromSeed, sealFromCustomId, seal, verify, verifySignature, type SealDb, type SealDeps } from '../../supabase/functions/receipt-seal/seal'
+import { NO_KEY, PREDATES_SIGNING, customIdFor, merchantKeyFromSeed, sealFromCustomId, seal, verify, verifySignature, type SealDb, type SealDeps } from '../../supabase/functions/receipt-seal/seal'
 import { createPayPalClient, PAYPAL_SANDBOX_BASE } from '../../supabase/functions/shopper-agent/paypal'
 import { SEAL_NOT_READY, startPayPal, type PaymentEvent, type PaymentStore } from '../../supabase/functions/shopper-agent/payment'
 
@@ -12,7 +12,7 @@ const ORDER = '12123471LF747714E'
 async function sealedReceipt(over: Record<string, unknown> = {}) {
   const row: Record<string, unknown> = {
     id: 'aaaaaaaa-0000-4000-8000-000000000001', receipt_ref: 'AR-2026-0059', order_ref: '15016', grant_id: 'g-1', merchant_id: 'm-1',
-    decision: 'pass', problems_found: 0, sealed_at: '2026-11-12T03:23:20.000Z', chain_seq: 7, prev_hash: GENESIS_HASH, ...over,
+    decision: 'pass', problems_found: 0, sealed_at: '2026-11-12T05:10:00.000Z', chain_seq: 7, prev_hash: GENESIS_HASH, ...over,
   }
   row.entry_hash = await computeEntryHash(row.prev_hash as string, row)
   return row
@@ -118,6 +118,31 @@ describe('Receipt seal: Ed25519 merchant signature', () => {
     if (v.type === 'verify') expect(v.checks.map((c) => c.key)).toEqual(['receipt', 'recompute', 'key', 'signature'])
     expect(await verify({ paypal_order_id: 'nope!' }, deps)).toMatchObject({ type: 'error' })
     expect(await verify({ paypal_order_id: 'AAAAAAAAAAAAAAAAA' }, deps)).toMatchObject({ type: 'error', message: 'PayPal Sandbox has no order AAAAAAAAAAAAAAAAA.' })
+  })
+})
+
+describe('Receipt seal: orders sealed before signing went live', () => {
+  const OLD = '2026-11-11T20:35:31.808Z' // order 15010's receipt, sealed before signing existed
+  it('an unsigned receipt sealed before signing is "unsigned" with a plain message, not "mismatch"', async () => {
+    const r = await sealedReceipt({ sealed_at: OLD })
+    const w = world(r, { customId: SID }) // its PayPal order carries the session id, as created then
+    const v = await verify({ paypal_order_id: ORDER }, await w.deps())
+    expect(v).toMatchObject({ type: 'verify', result: 'unsigned', message: PREDATES_SIGNING, signature: null })
+    if (v.type !== 'verify') return
+    expect(v.checks.find((c) => c.key === 'recompute')?.ok).toBe(true)
+    expect(v.checks.find((c) => c.key === 'signature')?.detail).toBe(PREDATES_SIGNING)
+    expect(v.checks.find((c) => c.key === 'custom_id')?.detail).toMatch(/created before receipt signing/)
+    expect(await verify({ receipt_id: r.id }, await w.deps())).toMatchObject({ result: 'unsigned' })
+  })
+
+  it('still "mismatch" when an old receipt no longer recomputes, or when a receipt sealed after signing has no signature', async () => {
+    const old = await sealedReceipt({ sealed_at: OLD })
+    old.decision = 'review_required' // edited after sealing
+    expect(await verify({ paypal_order_id: ORDER }, await world(old, { customId: SID }).deps())).toMatchObject({ result: 'mismatch', message: null })
+    const late = await sealedReceipt({ sealed_at: '2026-11-12T05:30:00.000Z' })
+    const v = await verify({ paypal_order_id: ORDER }, await world(late, { customId: `ap1:${late.entry_hash}` }).deps())
+    expect(v).toMatchObject({ result: 'mismatch' })
+    if (v.type === 'verify') expect(v.checks.find((c) => c.key === 'signature')?.detail).toBe('No signature stored for this receipt')
   })
 })
 

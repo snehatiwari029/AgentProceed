@@ -24,6 +24,10 @@ export const CUSTOM_ID_PREFIX = 'ap1:'
 export const SEAL_RE = /^sha256:[0-9a-f]{64}$/
 export const ALG = 'Ed25519'
 export const MESSAGE_FORMAT = 'Ed25519 signature over the UTF-8 bytes of the receipt seal string ("sha256:<64 hex>"); PayPal custom_id = "ap1:" + seal.'
+// Merchant signing went live when this function was first deployed. A receipt sealed before then was never signed
+// and its PayPal order (if any) carries no ap1 seal: verify says so plainly ("unsigned") instead of "mismatch".
+export const SIGNING_LIVE_AT = '2026-11-12T04:52:05Z'
+export const PREDATES_SIGNING = 'No signature: this order predates receipt signing.'
 const PKCS8_ED25519_PREFIX = '302e020100300506032b657004220420'
 const UUID = /^[0-9a-f-]{36}$/i
 const PAYPAL_ORDER_ID = /^[A-Z0-9]{8,32}$/
@@ -98,7 +102,8 @@ export type Reply =
   | { type: 'public_key'; alg: string; key_id: string; public_key: string; message_format: string }
   | ({ type: 'sealed'; receipt_ref: string | null; order_ref: string | null } & Signature)
   | {
-    type: 'verify'; result: 'match' | 'mismatch'; paypal_order_id: string | null; paypal_status: string | null
+    // unsigned: sealed before signing went live, never signed, and its record still verifies (not a failure).
+    type: 'verify'; result: 'match' | 'mismatch' | 'unsigned'; message: string | null; paypal_order_id: string | null; paypal_status: string | null
     custom_id: string | null; receipt_ref: string | null; order_ref: string | null; seal_hash: string | null
     signature: string | null; key_id: string | null; public_key: string | null; checks: Check[]
   }
@@ -183,9 +188,12 @@ export async function verify(body: Row, deps: SealDeps): Promise<Reply> {
   const stored = receipt ? str(receipt.entry_hash) : null
   const recomputed = receipt && typeof receipt.prev_hash === 'string' ? await computeEntryHash(receipt.prev_hash, receipt) : null
   const anchored = sealFromCustomId(customId)
+  const sealedAt = receipt ? Date.parse(String(receipt.sealed_at ?? '')) : NaN
+  const predates = !!receipt && !sig && Number.isFinite(sealedAt) && sealedAt < Date.parse(SIGNING_LIVE_AT)
+  const noSig = predates ? PREDATES_SIGNING : 'No signature stored for this receipt'
 
   if (ppId) {
-    checks.push({ key: 'custom_id', label: 'PayPal custom_id carries an ap1 seal', ok: anchored !== null, detail: customId ? `custom_id = ${customId}` : 'custom_id is empty on the PayPal order' })
+    checks.push({ key: 'custom_id', label: 'PayPal custom_id carries an ap1 seal', ok: anchored !== null, detail: `${customId ? `custom_id = ${customId}` : 'custom_id is empty on the PayPal order'}${predates && anchored === null ? ' (PayPal order created before receipt signing)' : ''}` })
   }
   checks.push({ key: 'receipt', label: 'Agent Receipt found for this order', ok: !!receipt, detail: receipt ? `${str(receipt.receipt_ref)} · order ${str(receipt.order_ref) ?? '–'}` : 'No receipt is linked to this order' })
   checks.push({
@@ -193,15 +201,19 @@ export async function verify(body: Row, deps: SealDeps): Promise<Reply> {
     detail: recomputed ? `recomputed ${recomputed}${stored && recomputed !== stored ? ` ≠ stored ${stored}` : ''}` : 'Nothing to recompute',
   })
   if (ppId) {
-    checks.push({ key: 'anchor', label: 'custom_id seal equals the receipt seal', ok: !!anchored && anchored === stored && anchored === recomputed, detail: anchored ? `${anchored}` : 'No seal in custom_id' })
+    checks.push({ key: 'anchor', label: 'custom_id seal equals the receipt seal', ok: !!anchored && anchored === stored && anchored === recomputed, detail: anchored ? `${anchored}` : predates ? 'No seal in custom_id: the PayPal order predates receipt signing' : 'No seal in custom_id' })
   }
   const keyOk = !!sig && sig.public_key === deps.key.publicKeyHex
-  checks.push({ key: 'key', label: 'Signed with the merchant\'s published key', ok: keyOk, detail: sig ? `${String(sig.key_id)}` : 'No signature stored for this receipt' })
+  checks.push({ key: 'key', label: 'Signed with the merchant\'s published key', ok: keyOk, detail: sig ? `${String(sig.key_id)}` : noSig })
   const sigOk = !!sig && !!stored && String(sig.seal_hash) === stored && (await verifySignature(deps.key.publicKeyHex, stored, String(sig.signature)))
-  checks.push({ key: 'signature', label: 'Ed25519 signature over the seal verifies', ok: sigOk, detail: sig ? `signature ${String(sig.signature).slice(0, 24)}…` : 'No signature stored for this receipt' })
+  checks.push({ key: 'signature', label: 'Ed25519 signature over the seal verifies', ok: sigOk, detail: sig ? `signature ${String(sig.signature).slice(0, 24)}…` : noSig })
 
+  // Unsigned only when the order predates signing AND everything that can still be checked holds (the receipt is found and
+  // recomputes; a PayPal custom_id, if it carries a seal at all, must match). Anything else is a mismatch.
+  const unsigned = predates && recomputed === stored && (anchored === null || anchored === stored)
+  const result = checks.every((c) => c.ok) ? 'match' : unsigned ? 'unsigned' : 'mismatch'
   return {
-    type: 'verify', result: checks.every((c) => c.ok) ? 'match' : 'mismatch', paypal_order_id: ppId, paypal_status: ppStatus,
+    type: 'verify', result, message: result === 'unsigned' ? PREDATES_SIGNING : null, paypal_order_id: ppId, paypal_status: ppStatus,
     custom_id: customId, receipt_ref: receipt ? str(receipt.receipt_ref) : null, order_ref: receipt ? str(receipt.order_ref) : null,
     seal_hash: stored, signature: sig ? String(sig.signature) : null, key_id: sig ? String(sig.key_id) : null, public_key: deps.key.publicKeyHex, checks,
   }
