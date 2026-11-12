@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { PayPalResult } from '../dashboard/components/PayPalEvidence'
+import { PayPalResult, Submitted } from '../dashboard/components/PayPalEvidence'
 import { createPayPalDisputesClient, PAYPAL_SANDBOX_BASE, type DisputesFetch } from '../../supabase/functions/paypal-disputes/paypal'
-import { NO_CAPTURE, NOT_RECEIVED_NO_SHIPMENT, PAYPAL_NOT_SET_UP, submitEvidence, type PayPalDisputesDb } from '../../supabase/functions/paypal-disputes/run'
+import { disputeStatus, NO_CAPTURE, NOT_RECEIVED_NO_SHIPMENT, PAYPAL_NOT_SET_UP, submitEvidence, type PayPalDisputesDb } from '../../supabase/functions/paypal-disputes/run'
 
 const MERCHANT = '32b14be6-26e6-49df-a7af-79532f910510'
 const RECEIPT = 'd9aed7ea-2882-4521-bf40-629863f016cf'
@@ -38,7 +38,9 @@ const detail = (over: Record<string, unknown>) => ({
   },
 })
 
-function world(opts: { shipment?: Record<string, unknown> | null; captured?: boolean } = {}) {
+const recorded: Record<string, unknown>[] = []
+function world(opts: { shipment?: Record<string, unknown> | null; captured?: boolean; failRecord?: boolean } = {}) {
+  recorded.length = 0
   const db: PayPalDisputesDb = {
     async merchant(id) { return id === MERCHANT ? { id, name: 'Northwind Outfitters' } : null },
     async receiptById(m, id) {
@@ -53,6 +55,7 @@ function world(opts: { shipment?: Record<string, unknown> | null; captured?: boo
         : []
     },
     async shipment() { return opts.shipment ?? null },
+    async recordSubmission(row) { recorded.push(row); if (opts.failRecord) throw new Error('db down'); return { id: 'sub-1', submitted_at: '2026-11-12T03:50:50.405Z' } },
   }
   return db
 }
@@ -87,6 +90,38 @@ describe('PayPal Sandbox Disputes: submit evidence', () => {
     const notes = String(input.evidences[0].notes)
     expect(input.evidences[0].evidence_type).toBe('PROOF_OF_RECEIPT_COPY')
     for (const s of [HASH, ORDER, CAPTURE, 'AR-2026-0053', 'UNAUTHORISED', 'Review Required']) expect(notes).toContain(s)
+    // Accepted by PayPal: exactly one submission record, with what was sent and the status before and after.
+    expect(r.recorded).toEqual({ id: 'sub-1', submitted_at: '2026-11-12T03:50:50.405Z' })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({
+      receipt_id: RECEIPT, merchant_id: MERCHANT, order_ref: '15010', paypal_dispute_id: DISPUTE, paypal_order_id: ORDER, capture_id: CAPTURE,
+      evidence_type: 'PROOF_OF_RECEIPT_COPY', receipt_hash: HASH, status_before: 'WAITING_FOR_SELLER_RESPONSE', status_after: 'UNDER_REVIEW', source: 'paypal-disputes', notes,
+    })
+  })
+
+  it('a storage failure after PayPal accepted is reported, never turned into a PayPal failure', async () => {
+    const f = fakeFetch({
+      'POST /v1/oauth2/token': TOKEN,
+      [`GET /v1/customer/disputes?disputed_transaction_id=${CAPTURE}`]: LIST,
+      [`GET /v1/customer/disputes/${DISPUTE}`]: [detail({}), detail({ status: 'UNDER_REVIEW' })],
+      [`POST /v1/customer/disputes/${DISPUTE}/provide-evidence`]: { body: {} },
+    })
+    const r = await submitEvidence(body, { db: world({ failRecord: true }), paypal: createPayPalDisputesClient('id', 'secret', f.fn) })
+    expect(r).toMatchObject({ type: 'paypal_evidence', result: { outcome: 'submitted' }, recorded: null })
+    if (r.type === 'paypal_evidence') expect(r.record_error).toContain('PayPal accepted')
+  })
+
+  it('dispute_status reads the dispute and sends nothing; no dispute says so', async () => {
+    const f = fakeFetch({
+      'POST /v1/oauth2/token': TOKEN,
+      [`GET /v1/customer/disputes?disputed_transaction_id=${CAPTURE}`]: [LIST, { body: { items: [] } }],
+      [`GET /v1/customer/disputes/${DISPUTE}`]: detail({ status: 'UNDER_REVIEW', links: [{ rel: 'self' }] }),
+    })
+    const client = createPayPalDisputesClient('id', 'secret', f.fn)
+    expect(await disputeStatus(body, { db: world(), paypal: client })).toMatchObject({ type: 'paypal_status', result: { outcome: 'status', dispute: { status: 'UNDER_REVIEW' } } })
+    expect(await disputeStatus(body, { db: world(), paypal: client })).toMatchObject({ result: { outcome: 'no_dispute' } })
+    expect(f.seen.every((x) => x.method === 'GET' || x.url.endsWith('/oauth2/token'))).toBe(true)
+    expect(recorded).toHaveLength(0)
   })
 
   it('says evidence submission is not available yet when there is no provide_evidence link, and sends nothing', async () => {
@@ -98,6 +133,7 @@ describe('PayPal Sandbox Disputes: submit evidence', () => {
     const r = await submitEvidence(body, { db: world(), paypal: createPayPalDisputesClient('id', 'secret', f.fn) })
     expect(r).toMatchObject({ type: 'paypal_evidence', result: { outcome: 'not_available', dispute: { stage: 'INQUIRY' } } })
     expect(f.seen.some((s) => s.url.endsWith('/provide-evidence'))).toBe(false)
+    expect(recorded).toHaveLength(0)
   })
 
   it('item not received with no shipment: does not present the record as proof of fulfillment', async () => {
@@ -109,6 +145,7 @@ describe('PayPal Sandbox Disputes: submit evidence', () => {
     const r = await submitEvidence(body, { db: world(), paypal: createPayPalDisputesClient('id', 'secret', f.fn) })
     expect(r).toMatchObject({ type: 'paypal_evidence', result: { outcome: 'not_submitted', message: NOT_RECEIVED_NO_SHIPMENT } })
     expect(f.seen.some((s) => s.url.endsWith('/provide-evidence'))).toBe(false)
+    expect(recorded).toHaveLength(0)
   })
 
   it('item not received with a shipment: sends proof of fulfillment with the recorded tracking', async () => {
@@ -142,6 +179,7 @@ describe('PayPal Sandbox Disputes: submit evidence', () => {
     expect(r.message).toContain('422')
     expect(r.paypal).toMatchObject({ status: 422, issue: 'NOTES_TOO_LONG', attempts: [{ evidence_type: 'PROOF_OF_RECEIPT_COPY' }, { evidence_type: 'DETAILS_OF_PURCHASE' }] })
     expect(r.paypal?.detail).toContain('Notes too long')
+    expect(recorded).toHaveLength(0)
   })
 
   it('no dispute on the transaction, no captured payment, no credentials, wrong merchant', async () => {
@@ -164,5 +202,24 @@ describe('PayPal Sandbox Disputes: result panel', () => {
     expect(screen.getByTestId('paypal-evidence-submitted').textContent).toContain('now: UNDER_REVIEW')
     rerender(<PayPalResult reply={{ type: 'error', message: 'PayPal Sandbox provide-evidence returned 422 (NOTES_TOO_LONG).', paypal: { status: 422, issue: 'NOTES_TOO_LONG', detail: 'Notes too long', dispute: null, attempts: [] } }} />)
     expect(screen.getByRole('alert').textContent).toContain('Notes too long')
+  })
+})
+
+describe('PayPal Sandbox Disputes: recorded submission', () => {
+  it('shows Submitted with evidence type, receipt hash, time and the live PayPal status', () => {
+    const s = {
+      id: 'x', receipt_id: RECEIPT, order_ref: '15016', paypal_dispute_id: 'PP-R-BHF-10199678', paypal_order_id: '12123471LF747714E', capture_id: '4BM03217CF5644340',
+      evidence_type: 'ITEM_DESCRIPTION', receipt_hash: HASH, dispute_reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED', stage_before: 'CHARGEBACK',
+      status_before: 'WAITING_FOR_SELLER_RESPONSE', stage_after: 'CHARGEBACK', status_after: 'UNDER_REVIEW', dispute_state_after: 'UNDER_PAYPAL_REVIEW',
+      source: 'backfill', submitted_at: '2026-11-12T03:50:50.405Z',
+    }
+    const live = { type: 'paypal_status' as const, environment: 'sandbox' as const, order_ref: '15016', paypal_order_id: s.paypal_order_id, result: { outcome: 'status' as const, transaction_id: s.capture_id, dispute: { dispute_id: s.paypal_dispute_id, status: 'UNDER_REVIEW', reason: s.dispute_reason, stage: 'CHARGEBACK', dispute_state: 'UNDER_PAYPAL_REVIEW', amount: '370.83', currency: 'USD', create_time: null, update_time: null, seller_response_due_date: null, links: ['self'] } } }
+    render(<Submitted s={s} live={live} />)
+    const box = screen.getByTestId('paypal-evidence-recorded')
+    expect(box.textContent).toContain('PayPal accepted this evidence')
+    expect(screen.getByTestId('submitted-evidence-type').textContent).toBe('ITEM_DESCRIPTION')
+    expect(screen.getByTestId('submitted-receipt-hash').textContent).toBe(HASH)
+    expect(screen.getByTestId('submitted-at').textContent).toBe('2026-11-12 03:50 UTC')
+    expect(screen.getByTestId('paypal-dispute-status').textContent).toContain('UNDER_REVIEW')
   })
 })

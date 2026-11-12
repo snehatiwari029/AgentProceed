@@ -14,7 +14,7 @@ import { sampleDisputeFor, SAMPLE_ORDER_REF } from '../sampleDispute'
 import { packExport, packToHtml } from '../packView'
 import { Card, Empty, Live, PageTitle } from '../components/Panel'
 import VerdictTable from '../components/VerdictTable'
-import PayPalEvidence from '../components/PayPalEvidence'
+import PayPalEvidence, { type EvidenceSubmission } from '../components/PayPalEvidence'
 
 type Merchant = { id: string; name: string }
 type Row = Record<string, unknown>
@@ -124,6 +124,8 @@ export default function Disputes() {
   const shipments = useRows<Shipment>('shipments', 'chain_seq', true, reload)
   // PayPal Sandbox payments (read-only). Not part of the page's load state: if it cannot be read, the page is unchanged.
   const payments = useRows<PaymentRow>('payment_events', 'chain_seq', true, reload)
+  // Evidence submissions PayPal accepted (read-only). Like payments, not part of the page's load state.
+  const submissions = useRows<EvidenceSubmission>('paypal_evidence_submissions', 'submitted_at', true, reload)
   const [open, setOpen] = useState<string | null>(null)
   const [auto, setAuto] = useState<string | null>(null)
 
@@ -159,7 +161,7 @@ export default function Disputes() {
           const rcpts = receipts.status === 'ready' ? receipts.rows : []
           const evs = events.status === 'ready' ? events.rows : []
           const ships = shipments.status === 'ready' ? shipments.rows : []
-          const paid = paypalCaptures(rcpts.filter((r) => r.merchant_id === merchant.id), payments.status === 'ready' ? payments.rows : [])
+          const paid = paypalCaptures(rcpts.filter((r) => r.merchant_id === merchant.id), payments.status === 'ready' ? payments.rows : [], submissions.status === 'ready' ? submissions.rows : [])
           // This merchant's disputes only: a dispute belongs to the merchant of its order's receipt.
           const rows: ListRow[] = (disputes.status === 'ready' ? disputes.rows : [])
             .map((d) => ({ d, receipt: rcpts.find((r) => r.id === d.receipt_id && r.merchant_id === merchant.id) }))
@@ -186,13 +188,15 @@ type ListRow = { d: Dispute; receipt: Receipt; events: DisputeEvent[]; shipment:
 
 // ---------- PayPal Sandbox ----------
 type PaymentRow = { grant_id: string; event: string; paypal_order_id: string | null; capture_id: string | null; chain_seq: number }
-type PayPalCapture = { receipt: Receipt; paypal_order_id: string | null; capture_id: string }
+type PayPalCapture = { receipt: Receipt; paypal_order_id: string | null; capture_id: string; submission: EvidenceSubmission | null }
 // Orders paid through PayPal Sandbox: the last captured payment of each order's grant, newest order first.
-function paypalCaptures(receipts: Receipt[], payments: PaymentRow[]): PayPalCapture[] {
+function paypalCaptures(receipts: Receipt[], payments: PaymentRow[], submissions: EvidenceSubmission[]): PayPalCapture[] {
   const out: PayPalCapture[] = []
   for (const r of receipts) {
     const cap = payments.filter((p) => p.grant_id === r.grant_id && p.event === 'captured' && p.capture_id).pop()
-    if (cap?.capture_id) out.push({ receipt: r, paypal_order_id: cap.paypal_order_id, capture_id: cap.capture_id })
+    // The latest accepted submission on this order's own transaction.
+    const submission = submissions.filter((x) => x.receipt_id === r.id && x.capture_id === cap?.capture_id).pop() ?? null
+    if (cap?.capture_id) out.push({ receipt: r, paypal_order_id: cap.paypal_order_id, capture_id: cap.capture_id, submission })
   }
   return out.sort((a, b) => (b.receipt.sealed_at ?? '').localeCompare(a.receipt.sealed_at ?? ''))
 }
@@ -216,7 +220,7 @@ function PayPalDisputes({ merchant, paid, rows }: { merchant: Merchant; paid: Pa
               <p className="mb-1 text-xs text-dash-label">{product || 'Product not in record'}{total === null ? '' : ` · ${formatMoney(total)}`} · {p.receipt.receipt_ref}</p>
               <PayPalEvidence
                 merchantId={merchant.id} receiptId={p.receipt.id} disputeId={rows.find((r) => !r.sample && r.receipt.id === p.receipt.id)?.d.id ?? null}
-                orderRef={p.receipt.order_ref} paypalOrderId={p.paypal_order_id} captureId={p.capture_id}
+                orderRef={p.receipt.order_ref} paypalOrderId={p.paypal_order_id} captureId={p.capture_id} submission={p.submission}
               />
             </div>
           )
@@ -537,7 +541,7 @@ function DisputeDetail({ row, merchant, reload, onChanged, autoGenerate, clearAu
               <Block title="PayPal Sandbox dispute" testid="paypal-dispute">
                 <PayPalEvidence
                   merchantId={merchant.id} receiptId={receipt.id} disputeId={d.id} orderRef={receipt.order_ref}
-                  paypalOrderId={row.paypal.paypal_order_id} captureId={row.paypal.capture_id}
+                  paypalOrderId={row.paypal.paypal_order_id} captureId={row.paypal.capture_id} submission={row.paypal.submission}
                 />
               </Block>
             )}

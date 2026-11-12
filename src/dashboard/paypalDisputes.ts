@@ -2,7 +2,12 @@ import type { Reply } from '../../supabase/functions/paypal-disputes/run'
 
 // The Dispute page's "Submit evidence to PayPal (Sandbox)" calls the paypal-disputes edge function (publishable key
 // only). Every PayPal call, and the PayPal client id and secret, stay on the server.
-export type PayPalEvidenceRequest = { action: 'submit_evidence'; merchant_id: string; receipt_id: string; dispute_id?: string | null }
+export type PayPalEvidenceRequest =
+  | { action: 'submit_evidence'; merchant_id: string; receipt_id: string; dispute_id?: string | null }
+  | { action: 'dispute_status'; merchant_id: string; receipt_id: string }
+
+// Read-only: the dispute's current status as PayPal reports it. Sends nothing to the dispute.
+export const paypalDisputeStatus = (body: Extract<PayPalEvidenceRequest, { action: 'dispute_status' }>) => submitPayPalEvidence(body)
 
 export async function submitPayPalEvidence(body: PayPalEvidenceRequest): Promise<Reply> {
   const base = import.meta.env.VITE_SUPABASE_URL
