@@ -3,7 +3,8 @@
 // and the order (receipt) id; it never sees PayPal credentials, tokens or URLs it could call itself.
 // Deployed with verify_jwt = false: the demo dashboard calls it with the publishable key (not a JWT), like disputes.
 // Secrets: PAYPAL_CLIENT_ID / PAYPAL_SECRET (the same Sandbox app as the Orders checkout in shopper-agent).
-// Reads with the service role (receipt, dispute, payment_events and shipment of that one order); writes nothing.
+// Reads with the service role (receipt, dispute, payment_events and shipment of that one order). Writes only one
+// paypal_evidence_submissions row, after PayPal accepted a submission.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { ROUTES, type PayPalDisputesDb } from './run.ts'
 import { createPayPalDisputesClient } from './paypal.ts'
@@ -35,6 +36,11 @@ function createDb(db: any): PayPalDisputesDb {
       const r = await db.from('payment_events').select('event,paypal_order_id,capture_id,status,chain_seq').eq('grant_id', grantId).order('chain_seq', { ascending: true })
       if (r.error) throw new Error(`read payment events: ${r.error.message}`)
       return (r.data ?? []) as Row[]
+    },
+    async recordSubmission(row) {
+      const r = await db.from('paypal_evidence_submissions').insert(row).select('id,submitted_at').limit(1)
+      if (r.error) throw new Error(`insert submission: ${r.error.message}`)
+      return r.data[0] as { id: string; submitted_at: string }
     },
     shipment: (receiptId) => one(db.from('shipments').select('carrier,tracking_ref,shipped_on,delivered_on').eq('receipt_id', receiptId).limit(1), 'read shipment'),
   }

@@ -60,7 +60,13 @@ export type SubmitResult =
   | { outcome: 'not_submitted'; transaction_id: string; dispute: DisputeSummary; message: string }
   | { outcome: 'submitted'; transaction_id: string; dispute_before: DisputeSummary; dispute: DisputeSummary; response: unknown; request: unknown; attempts: Attempt[] }
 
+export type StatusResult =
+  | { outcome: 'no_dispute'; transaction_id: string; message: string }
+  | { outcome: 'status'; transaction_id: string; dispute: DisputeSummary }
+
 export interface PayPalDisputesClient {
+  // Read-only: the PayPal dispute on this transaction, as PayPal reports it now. Sends nothing.
+  disputeStatus(transactionId: string): Promise<StatusResult>
   // evidence is built from the dispute PayPal returned (its reason is part of the notes).
   submitEvidence(transactionId: string, evidence: (dispute: DisputeSummary) => EvidenceInput, requestId: string): Promise<SubmitResult>
 }
@@ -144,14 +150,25 @@ export function createPayPalDisputesClient(clientId: string, secret: string, fet
   }
 
   const details = async (id: string) => (await call('GET', `${PAYPAL_SANDBOX_BASE}/v1/customer/disputes/${id}`, 'dispute details')) as Record<string, unknown>
+  // The canonical dispute_id for this transaction, from PayPal's list (an open one first, then the newest), or null.
+  const findDispute = async (transactionId: string): Promise<string | null> => {
+    if (!PAYPAL_TRANSACTION_ID.test(transactionId)) throw new Error('Bad PayPal transaction id')
+    const list = (await call('GET', `${PAYPAL_SANDBOX_BASE}/v1/customer/disputes?disputed_transaction_id=${encodeURIComponent(transactionId)}`, 'list disputes')) as { items?: Record<string, unknown>[] } | null
+    const items = (list?.items ?? []).filter((i) => typeof i.dispute_id === 'string' && PAYPAL_DISPUTE_ID.test(i.dispute_id))
+    return items.length ? ([...items].sort(OPEN_FIRST)[0].dispute_id as string) : null
+  }
+  const noDispute = (transactionId: string) => ({ outcome: 'no_dispute' as const, transaction_id: transactionId, message: `PayPal Sandbox has no dispute on transaction ${transactionId}.` })
 
   return {
+    async disputeStatus(transactionId) {
+      const disputeId = await findDispute(transactionId)
+      if (!disputeId) return noDispute(transactionId)
+      return { outcome: 'status', transaction_id: transactionId, dispute: summarize(await details(disputeId)) }
+    },
+
     async submitEvidence(transactionId, evidence, requestId) {
-      if (!PAYPAL_TRANSACTION_ID.test(transactionId)) throw new Error('Bad PayPal transaction id')
-      const list = (await call('GET', `${PAYPAL_SANDBOX_BASE}/v1/customer/disputes?disputed_transaction_id=${encodeURIComponent(transactionId)}`, 'list disputes')) as { items?: Record<string, unknown>[] } | null
-      const items = (list?.items ?? []).filter((i) => typeof i.dispute_id === 'string' && PAYPAL_DISPUTE_ID.test(i.dispute_id))
-      if (items.length === 0) return { outcome: 'no_dispute', transaction_id: transactionId, message: `PayPal Sandbox has no dispute on transaction ${transactionId}.` }
-      const disputeId = [...items].sort(OPEN_FIRST)[0].dispute_id as string
+      const disputeId = await findDispute(transactionId)
+      if (!disputeId) return noDispute(transactionId)
 
       const before = await details(disputeId)
       if (!provideEvidenceHref(before)) {

@@ -1,14 +1,16 @@
 // PayPal Sandbox dispute evidence, one request at a time. Pure TypeScript: the database and the PayPal client are
 // injected, so tests run it without the network. Runs in the `paypal-disputes` edge function with the service role.
 //
-// One action (and nothing else):
+// Actions (and nothing else):
+//   dispute_status   read-only: the PayPal dispute on this order's transaction, as PayPal reports it now.
 //   submit_evidence  for ONE order of ONE merchant: reads its captured PayPal Sandbox payment (order id + capture id),
 //                    finds the PayPal dispute on that transaction and, when PayPal offers the provide_evidence action,
 //                    submits the order's evidence: receipt hash, PayPal order and transaction ids, reason code and the
-//                    pre-fulfillment verdict (plus tracking when the order's shipment record has it). Writes nothing to the database; the evidence packet itself is not changed.
+//                    pre-fulfillment verdict (plus tracking when the order's shipment record has it). Only when PayPal
+//                    accepts the evidence is one paypal_evidence_submissions row appended; the evidence packet is not changed.
 //
 // MERCHANT ISOLATION: the order must belong to merchant_id (receipt.merchant_id); a named dispute must belong to it.
-import { PayPalError, type Attempt, type DisputeSummary, type EvidenceCandidate, type EvidenceInput, type PayPalDisputesClient, type SubmitResult } from './paypal.ts'
+import { PayPalError, type Attempt, type DisputeSummary, type EvidenceCandidate, type EvidenceInput, type PayPalDisputesClient, type StatusResult, type SubmitResult } from './paypal.ts'
 
 type Row = Record<string, unknown>
 
@@ -18,13 +20,20 @@ export interface PayPalDisputesDb {
   disputeById(id: string): Promise<Row | null>
   paymentEvents(grantId: string): Promise<Row[]>
   shipment(receiptId: string): Promise<Row | null>
+  // Appends one paypal_evidence_submissions row (only after PayPal accepted the evidence). Returns the stored row.
+  recordSubmission(row: Row): Promise<{ id: string; submitted_at: string }>
 }
 
 // paypal: null when PAYPAL_CLIENT_ID / PAYPAL_SECRET are not set.
 export type PayPalDisputesDeps = { db: PayPalDisputesDb; paypal: PayPalDisputesClient | null }
 
 export type Reply =
-  | { type: 'paypal_evidence'; environment: 'sandbox'; order_ref: string | null; paypal_order_id: string | null; result: SubmitResult }
+  | {
+    type: 'paypal_evidence'; environment: 'sandbox'; order_ref: string | null; paypal_order_id: string | null; result: SubmitResult
+    // Set only for an accepted submission: the stored record, or why it could not be stored (PayPal still accepted it).
+    recorded?: { id: string; submitted_at: string } | null; record_error?: string | null
+  }
+  | { type: 'paypal_status'; environment: 'sandbox'; order_ref: string | null; paypal_order_id: string | null; result: StatusResult }
   | { type: 'error'; message: string; paypal?: { status: number; issue: string | null; detail: string | null; dispute: DisputeSummary | null; attempts: Attempt[] } }
 
 export const PAYPAL_NOT_SET_UP = 'PayPal Sandbox is not set up on the server (PAYPAL_CLIENT_ID / PAYPAL_SECRET).'
@@ -77,7 +86,8 @@ export function evidencePlan(reason: string | null, shipment: Row | null): { can
   return { candidates: types.map((evidence_type) => ({ evidence_type })) }
 }
 
-export async function submitEvidence(body: Row, deps: PayPalDisputesDeps): Promise<Reply> {
+// The order, its optional recorded dispute and its captured PayPal payment, for this merchant only.
+async function orderFor(body: Row, deps: PayPalDisputesDeps) {
   const { db } = deps
   if (typeof body.merchant_id !== 'string' || !UUID.test(body.merchant_id)) return err('Unknown merchant.')
   const merchant = await db.merchant(body.merchant_id)
@@ -95,19 +105,69 @@ export async function submitEvidence(body: Row, deps: PayPalDisputesDeps): Promi
   const captured = [...await db.paymentEvents(receipt.grant_id)].reverse().find((e) => e.event === 'captured' && typeof e.capture_id === 'string')
   if (!captured) return err(NO_CAPTURE)
   if (!deps.paypal) return err(PAYPAL_NOT_SET_UP)
-  const shipment = await db.shipment(receipt.id as string)
   const payment = { paypal_order_id: typeof captured.paypal_order_id === 'string' ? captured.paypal_order_id : null, capture_id: captured.capture_id as string }
+  return { merchant, receipt, dispute, payment, paypal: deps.paypal }
+}
+
+const paypalErr = (e: unknown): Reply =>
+  e instanceof PayPalError
+    ? { type: 'error', message: `${e.message}${e.issue ? ` (${e.issue})` : ''}.`, paypal: { status: e.status, issue: e.issue, detail: e.detail, dispute: e.dispute, attempts: e.attempts } }
+    : err(`PayPal Sandbox could not be reached: ${e instanceof Error ? e.message : 'unknown error'}.`)
+
+export async function submitEvidence(body: Row, deps: PayPalDisputesDeps): Promise<Reply> {
+  const o = await orderFor(body, deps)
+  if ('type' in o) return o
+  const { db } = deps
+  const { merchant, receipt, dispute, payment } = o
+  const shipment = await db.shipment(receipt.id as string)
   try {
-    const result = await deps.paypal.submitEvidence(
+    const result = await o.paypal.submitEvidence(
       payment.capture_id,
       (pp) => paypalEvidence(receipt, payment, dispute, shipment, pp),
       `ap-evidence-${String(receipt.id)}`,
     )
-    return { type: 'paypal_evidence', environment: 'sandbox', order_ref: typeof receipt.order_ref === 'string' ? receipt.order_ref : null, paypal_order_id: payment.paypal_order_id, result }
+    const reply: Extract<Reply, { type: 'paypal_evidence' }> = { type: 'paypal_evidence', environment: 'sandbox', order_ref: typeof receipt.order_ref === 'string' ? receipt.order_ref : null, paypal_order_id: payment.paypal_order_id, result }
+    if (result.outcome !== 'submitted') return reply
+    // Accepted by PayPal: record it. A storage failure is reported, never turned into a PayPal failure.
+    try {
+      reply.recorded = await db.recordSubmission(submissionRow(receipt, merchant.id, payment, result))
+      reply.record_error = null
+    } catch (e) {
+      console.error('record submission failed', e instanceof Error ? e.message : e)
+      reply.recorded = null
+      reply.record_error = 'PayPal accepted the evidence, but Agent Proceed could not store the submission record.'
+    }
+    return reply
   } catch (e) {
-    if (e instanceof PayPalError) return { type: 'error', message: `${e.message}${e.issue ? ` (${e.issue})` : ''}.`, paypal: { status: e.status, issue: e.issue, detail: e.detail, dispute: e.dispute, attempts: e.attempts } }
-    return err(`PayPal Sandbox could not be reached: ${e instanceof Error ? e.message : 'unknown error'}.`)
+    return paypalErr(e)
   }
 }
 
-export const ROUTES: Record<string, (body: Row, deps: PayPalDisputesDeps) => Promise<Reply>> = { submit_evidence: submitEvidence }
+export function submissionRow(
+  receipt: Row, merchantId: string, payment: { paypal_order_id: string | null; capture_id: string }, r: Extract<SubmitResult, { outcome: 'submitted' }>,
+): Row {
+  const sent = (r.request as { evidences?: { evidence_type?: unknown; notes?: unknown }[] } | null)?.evidences?.[0]
+  return {
+    receipt_id: receipt.id, merchant_id: merchantId, order_ref: typeof receipt.order_ref === 'string' ? receipt.order_ref : null,
+    environment: 'sandbox', paypal_dispute_id: r.dispute.dispute_id, paypal_order_id: payment.paypal_order_id, capture_id: payment.capture_id,
+    evidence_type: typeof sent?.evidence_type === 'string' ? sent.evidence_type : r.attempts[r.attempts.length - 1]?.evidence_type ?? 'unknown',
+    receipt_hash: String(receipt.entry_hash ?? ''), dispute_reason: r.dispute_before.reason,
+    stage_before: r.dispute_before.stage, status_before: r.dispute_before.status,
+    stage_after: r.dispute.stage, status_after: r.dispute.status, dispute_state_after: r.dispute.dispute_state,
+    notes: typeof sent?.notes === 'string' ? sent.notes : null, source: 'paypal-disputes',
+  }
+}
+
+// Read-only: the PayPal dispute on this order's transaction as PayPal reports it now. Sends nothing, writes nothing.
+export async function disputeStatus(body: Row, deps: PayPalDisputesDeps): Promise<Reply> {
+  const o = await orderFor(body, deps)
+  if ('type' in o) return o
+  try {
+    const result = await o.paypal.disputeStatus(o.payment.capture_id)
+    return { type: 'paypal_status', environment: 'sandbox', order_ref: typeof o.receipt.order_ref === 'string' ? o.receipt.order_ref : null, paypal_order_id: o.payment.paypal_order_id, result }
+  } catch (e) {
+    return paypalErr(e)
+  }
+}
+
+export const ROUTES: Record<string, (body: Row, deps: PayPalDisputesDeps) => Promise<Reply>> = { submit_evidence: submitEvidence, dispute_status: disputeStatus }
