@@ -283,6 +283,22 @@ export const content = {
     ],
     repoLabel: 'Source code on GitHub',
     repoUrl: 'https://github.com/snehatiwari029/AgentProceed',
+    // Evals Results: exact values from evals/verdict_eval_results.md (npm run eval:verdict). Rerun the eval and update both together.
+    evals: {
+      title: 'Evals Results',
+      method: 'We ran 15 labeled agent orders, built from the Northwind Outfitters catalog, through the unchanged verifying agent and compared each verdict (Pass, Review Required or Hold for Suspicion) with its label. The baseline is no verification: every order ships.',
+      columns: ['Metric', 'Agent Proceed', 'Baseline', 'What it means for a merchant'],
+      rows: [
+        { metric: 'Miss rate', ours: '0.0%', baseline: '100.0%', meaning: 'Bad orders that got Pass and would ship' },
+        { metric: 'Chargebacks prevented', ours: '100.0%', baseline: '0.0%', meaning: 'Bad orders caught before shipping' },
+        { metric: 'False-hold rate', ours: '0.0%', baseline: '0.0%', meaning: 'Good orders held by mistake' },
+        { metric: 'Accuracy', ours: '80.0%', baseline: '33.3%', meaning: 'Verdicts that exactly match the label' },
+        { metric: 'Receipt integrity', ours: '93.3%', baseline: 'no receipt', meaning: 'Receipts whose hash chain verifies' },
+      ],
+      note: 'Three of the four Hold for Suspicion cases came back Review Required: still stopped before shipping, but at a lower severity. The one receipt that failed verification belongs to a case we tampered with on purpose, and the agent correctly held it.',
+      reportLabel: 'Full eval report on GitHub',
+      reportUrl: 'https://github.com/snehatiwari029/AgentProceed/blob/main/evals/verdict_eval_results.md',
+    },
     tryTitle: 'What to try',
     trySteps: [
       { title: 'Chat', text: 'Open the chat, tap "Try the demo test sequence" and send it. Muse finds a snowboard and places the order.' },
