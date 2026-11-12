@@ -62,3 +62,23 @@ describe('Hero scene', () => {
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.site \.scene-link \{ animation: none; stroke-dashoffset: 0; opacity: 1; \}/)
   })
 })
+
+describe('Hackathon page: Evals Results', () => {
+  it('comes after the three demos and shows the eval numbers with their baselines, exactly as in the report', () => {
+    at('/hackathon')
+    const heading = screen.getByRole('heading', { name: 'Evals Results' })
+    const demos = screen.getByTestId('demo-dashboard')
+    expect(demos.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const rows = within(screen.getByTestId('evals-table')).getAllByRole('row').slice(1).map((r) => Array.from(r.children).slice(0, 3).map((c) => c.textContent))
+    expect(rows).toEqual([
+      ['Miss rate', '0.0%', '100.0%'],
+      ['Chargebacks prevented', '100.0%', '0.0%'],
+      ['False-hold rate', '0.0%', '0.0%'],
+      ['Accuracy', '80.0%', '33.3%'],
+      ['Receipt integrity', '93.3%', 'no receipt'],
+    ])
+    const report = readFileSync('evals/verdict_eval_results.md', 'utf8')
+    for (const v of ['**0.0%** (0/10)', '**100.0%** (10/10)', '**0.0%** (0/5)', '**80.0%** (12/15)', '**93.3%** (14/15)', '33.3% (5/15)']) expect(report).toContain(v)
+    expect(screen.getByRole('link', { name: /Full eval report on GitHub/ })).toHaveAttribute('href', 'https://github.com/snehatiwari029/AgentProceed/blob/main/evals/verdict_eval_results.md')
+  })
+})

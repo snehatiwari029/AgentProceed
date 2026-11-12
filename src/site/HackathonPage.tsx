@@ -39,6 +39,34 @@ export default function HackathonPage() {
           </div>
         </section>
 
+        <section className="hack-evals" aria-labelledby="evals-h">
+          <div className="wrap">
+            <h2 id="evals-h">{h.evals.title}</h2>
+            <p className="evals-method">{h.evals.method}</p>
+            <div className="evals-card">
+              <table className="evals-table" data-testid="evals-table">
+                <thead>
+                  <tr>{h.evals.columns.map((col) => <th key={col} scope="col">{col}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {h.evals.rows.map((r) => (
+                    <tr key={r.metric}>
+                      <th scope="row">{r.metric}</th>
+                      <td className="evals-ours" data-label={h.evals.columns[1]}>{r.ours}</td>
+                      <td className="evals-base" data-label={h.evals.columns[2]}>{r.baseline}</td>
+                      <td className="evals-meaning">{r.meaning}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="evals-note">{h.evals.note}</p>
+            <p className="hack-repo">
+              <a className="link-btn" href={h.evals.reportUrl} target="_blank" rel="noreferrer">{h.evals.reportLabel} <Arrow /></a>
+            </p>
+          </div>
+        </section>
+
         <section className="hack-try" aria-labelledby="try-h">
           <div className="wrap">
             <h2 id="try-h">{h.tryTitle}</h2>
