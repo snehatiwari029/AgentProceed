@@ -15,6 +15,7 @@ import { packExport, packToHtml } from '../packView'
 import { Card, Empty, Live, PageTitle } from '../components/Panel'
 import VerdictTable from '../components/VerdictTable'
 import PayPalEvidence, { type EvidenceSubmission } from '../components/PayPalEvidence'
+import WebhookDispute, { type WebhookDisputeRow } from '../components/WebhookDispute'
 
 type Merchant = { id: string; name: string }
 type Row = Record<string, unknown>
@@ -126,6 +127,8 @@ export default function Disputes() {
   const payments = useRows<PaymentRow>('payment_events', 'chain_seq', true, reload)
   // Evidence submissions PayPal accepted (read-only). Like payments, not part of the page's load state.
   const submissions = useRows<EvidenceSubmission>('paypal_evidence_submissions', 'submitted_at', true, reload)
+  // PayPal disputes received through the verified PayPal webhook (read-only). Not part of the page's load state either.
+  const webhookDisputes = useRows<WebhookDisputeRow>('paypal_dispute_records', 'created_at', false, reload)
   const [open, setOpen] = useState<string | null>(null)
   const [auto, setAuto] = useState<string | null>(null)
 
@@ -172,7 +175,7 @@ export default function Disputes() {
           if (base) rows.push({ d: sampleDisputeFor(base), receipt: base, events: [], shipment: ships.find((s) => s.receipt_id === base.id) ?? null, sample: true })
           return (
             <DisputesBody
-              merchant={merchant} rows={rows} paid={paid} open={open} setOpen={setOpen} auto={auto}
+              merchant={merchant} rows={rows} paid={paid} webhook={webhookDisputes.status === 'ready' ? webhookDisputes.rows : []} open={open} setOpen={setOpen} auto={auto}
               openRef={openRef} clearOpenRef={() => setOpenRef(null)}
               onRecorded={(id) => { setAuto(id); setOpen(id); setReload((n) => n + 1) }}
               onChanged={() => setReload((n) => n + 1)} reload={reload} clearAuto={() => setAuto(null)}
@@ -201,8 +204,10 @@ function paypalCaptures(receipts: Receipt[], payments: PaymentRow[], submissions
   return out.sort((a, b) => (b.receipt.sealed_at ?? '').localeCompare(a.receipt.sealed_at ?? ''))
 }
 
-function PayPalDisputes({ merchant, paid, rows }: { merchant: Merchant; paid: PayPalCapture[]; rows: ListRow[] }) {
-  if (paid.length === 0) return null
+function PayPalDisputes({ merchant, paid, rows, webhook }: { merchant: Merchant; paid: PayPalCapture[]; rows: ListRow[]; webhook: WebhookDisputeRow[] }) {
+  // An unmatched webhook dispute is shown here too: it has no order of this merchant to hang on.
+  const unmatched = webhook.filter((w) => !w.matched)
+  if (paid.length === 0 && unmatched.length === 0) return null
   return (
     <Card label="PayPal Sandbox disputes">
       <p className="mb-3 text-sm text-dash-body" data-testid="paypal-disputes-intro">
@@ -222,16 +227,23 @@ function PayPalDisputes({ merchant, paid, rows }: { merchant: Merchant; paid: Pa
                 merchantId={merchant.id} receiptId={p.receipt.id} disputeId={rows.find((r) => !r.sample && r.receipt.id === p.receipt.id)?.d.id ?? null}
                 orderRef={p.receipt.order_ref} paypalOrderId={p.paypal_order_id} captureId={p.capture_id} submission={p.submission}
               />
+              {webhook.filter((w) => w.receipt_id === p.receipt.id).map((w) => <WebhookDispute key={w.paypal_dispute_id} d={w} />)}
             </div>
           )
         })}
       </div>
+      {unmatched.length > 0 && (
+        <div className="mt-4" data-testid="webhook-unmatched">
+          <p className="text-xs font-semibold uppercase tracking-wider text-dash-label">Received by PayPal webhook, not matched to a recorded order</p>
+          {unmatched.map((w) => <WebhookDispute key={w.paypal_dispute_id} d={w} />)}
+        </div>
+      )}
     </Card>
   )
 }
 
 function DisputesBody(props: {
-  merchant: Merchant; rows: ListRow[]; paid: PayPalCapture[]; open: string | null; setOpen: (id: string | null) => void; auto: string | null; clearAuto: () => void
+  merchant: Merchant; rows: ListRow[]; paid: PayPalCapture[]; webhook: WebhookDisputeRow[]; open: string | null; setOpen: (id: string | null) => void; auto: string | null; clearAuto: () => void
   openRef: string | null; clearOpenRef: () => void; onRecorded: (id: string) => void; onChanged: () => void; reload: number
 }) {
   const { merchant, rows, open, setOpen, openRef, clearOpenRef } = props
@@ -257,7 +269,7 @@ function DisputesBody(props: {
   return (
     <div className="flex flex-col gap-6">
       <RecordDispute merchant={merchant} onRecorded={props.onRecorded} />
-      <PayPalDisputes merchant={merchant} paid={props.paid} rows={rows} />
+      <PayPalDisputes merchant={merchant} paid={props.paid} rows={rows} webhook={props.webhook} />
 
       {rows.length === 0 ? (
         <Empty title="No disputes yet.">
