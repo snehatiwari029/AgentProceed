@@ -42,6 +42,8 @@ export interface PayPalClient {
     description: string
     returnUrl: string
     cancelUrl: string
+    // "ap1:" + the Agent Receipt seal, written on the order before payment. Without it, custom_id is referenceId.
+    customId?: string
   }): Promise<CreatedOrder>
   captureOrder(orderId: string): Promise<CapturedOrder>
 }
@@ -113,7 +115,7 @@ export function createPayPalClient(clientId: string, secret: string, fetchFn: Fe
         intent: 'CAPTURE',
         purchase_units: [{
           reference_id: input.referenceId,
-          custom_id: input.referenceId,
+          custom_id: (input.customId ?? input.referenceId).slice(0, 127),
           description: input.description.slice(0, 127),
           amount: { currency_code: input.currency, value: centsToValue(input.totalCents) },
         }],

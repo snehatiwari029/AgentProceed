@@ -20,6 +20,15 @@ declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 // The public site the shopper returns to after approving on PayPal. Fixed here, never taken from the request.
 const DEFAULT_SITE_URL = 'https://agent-receipt-mu.vercel.app'
 
+// Asks the receipt-seal function to sign this order's receipt seal (it waits for the receipt if it is still being sealed).
+async function sealReceipt(url: string, sessionId: string, timeoutMs: number): Promise<{ custom_id?: unknown } | null> {
+  const res = await fetch(`${url}/functions/v1/receipt-seal`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'seal', session_id: sessionId }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  return (await res.json().catch(() => null)) as { custom_id?: unknown } | null
+}
+
 const inBackground = (p: Promise<unknown>) => {
   try { if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(p) } catch { /* the promise still runs */ }
 }
@@ -55,7 +64,14 @@ Deno.serve(async (req) => {
     const paypalId = Deno.env.get('PAYPAL_CLIENT_ID')
     const paypalSecret = Deno.env.get('PAYPAL_SECRET')
     const paypal = paypalId && paypalSecret
-      ? { client: createPayPalClient(paypalId, paypalSecret), store: createPaymentStore(db), siteUrl: Deno.env.get('SITE_URL') ?? DEFAULT_SITE_URL, newId: () => crypto.randomUUID() }
+      ? {
+        client: createPayPalClient(paypalId, paypalSecret), store: createPaymentStore(db), siteUrl: Deno.env.get('SITE_URL') ?? DEFAULT_SITE_URL, newId: () => crypto.randomUUID(),
+        // The order's signed receipt seal, before the PayPal order is created (custom_id = "ap1:" + seal).
+        seal: async (sessionId: string) => {
+          const out = await sealReceipt(url, sessionId, 45_000)
+          return typeof out?.custom_id === 'string' ? { custom_id: out.custom_id } : null
+        },
+      }
       : undefined
 
     const deps: Deps = {
@@ -72,6 +88,8 @@ Deno.serve(async (req) => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId }),
         }).then(() => undefined).finally(() => clearTimeout(timer))
+          // Then sign the receipt's seal (every order, whatever the payment). A failure here never affects the order.
+          .then(() => sealReceipt(url, sessionId, 30_000)).then(() => undefined, () => undefined)
         inBackground(p)
         return p
       },

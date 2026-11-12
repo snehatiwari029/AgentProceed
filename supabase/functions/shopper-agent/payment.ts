@@ -33,6 +33,9 @@ export type PayPalDeps = {
   // The site the shopper returns to after approving. Fixed by the server (SITE_URL), never taken from the request.
   siteUrl: string
   newId: () => string
+  // The order's signed Agent Receipt seal (receipt-seal function): custom_id = "ap1:" + seal. When set, a PayPal order is
+  // only created once the receipt is sealed and signed, so the seal is on the order before the shopper pays.
+  seal?: (sessionId: string) => Promise<{ custom_id: string } | null>
 }
 
 export type PaymentReply =
@@ -49,6 +52,7 @@ export type PaymentReply =
   | { type: 'error'; message: string }
 
 export const NOT_SET_UP = 'PayPal Sandbox is not set up on this server yet.'
+export const SEAL_NOT_READY = 'Your order receipt is still being sealed. Please tap Pay with PayPal again in a moment.'
 
 const latest = (events: PaymentEvent[], type: PaymentEventType) => [...events].reverse().find((e) => e.event === type) ?? null
 
@@ -88,12 +92,20 @@ export async function startPayPal(raw: Record<string, unknown>, deps: PayPalDeps
     return { type: 'payment', session_id: c.sid, status: 'captured', paypal_order_id: done.paypal_order_id ?? undefined, capture_id: done.capture_id ?? undefined, amount_cents: done.amount_cents ?? undefined }
   }
   const back = (state: 'return' | 'cancel') => `${d.siteUrl.replace(/\/+$/, '')}/chat?paypal=${state}&session=${c.sid}`
+  let customId: string | undefined
+  if (d.seal) {
+    const sealed = await d.seal(c.sid).catch(() => null)
+    if (!sealed || !/^ap1:sha256:[0-9a-f]{64}$/.test(sealed.custom_id)) {
+      return { type: 'payment', session_id: c.sid, status: 'failed', message: SEAL_NOT_READY }
+    }
+    customId = sealed.custom_id
+  }
   try {
     // The same session always asks PayPal with the same request id, so a second tap returns the same PayPal order.
     const order = await d.client.createOrder({
       totalCents: c.checkout.totalCents, currency: c.checkout.currency, requestId: `ap-order-${c.sid}`, referenceId: c.sid,
       description: c.checkout.productName ? `Northwind Outfitters: ${c.checkout.productName}` : 'Northwind Outfitters order',
-      returnUrl: back('return'), cancelUrl: back('cancel'),
+      returnUrl: back('return'), cancelUrl: back('cancel'), customId,
     })
     if (!isPayPalApproveUrl(order.approveUrl)) return { type: 'error', message: 'PayPal Sandbox returned no approval link.' }
     const known = c.events.some((e) => e.event === 'order_created' && e.paypal_order_id === order.id)

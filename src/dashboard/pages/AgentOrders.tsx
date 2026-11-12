@@ -9,6 +9,7 @@ import { DecisionBadge } from '../components/Badges'
 import VerdictTable from '../components/VerdictTable'
 import MerchantActions from '../components/MerchantActions'
 import PaymentRecord from '../components/PaymentRecord'
+import ReceiptSeal from '../components/ReceiptSeal'
 
 type Session = {
   id: string
@@ -280,6 +281,7 @@ export default function AgentOrders() {
                       )}
                       <VerdictTable rows={withPaymentLabel(withProductName(r.mismatch_results, r.terms_snapshot), o.paypal)} />
                       <PaymentRecord grantId={r.grant_id} />
+                      <ReceiptSeal receiptId={r.id} grantId={r.grant_id} sealHash={r.entry_hash} />
                       {r.missing_components.length > 0 && (
                         <p className="mt-3 text-sm text-dash-attention">
                           Missing record components: {r.missing_components.join(', ')}.
