@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed:generate": "tsx scripts/seed-dashboard-demo.ts"
+    "seed:generate": "tsx scripts/seed-dashboard-demo.ts",
+    "eval:verdict": "tsx scripts/run-verdict-eval.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
