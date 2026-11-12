@@ -6,9 +6,8 @@ AI agents now shop and pay on behalf of real shoppers. Nothing checks whether th
 
 - **Live demo:** https://agent-proceed-mu.vercel.app (shop at `/shop`, chat at `/chat`, dashboard at `/dashboard`, hackathon page at `/hackathon`)
 - **Receipt service:** https://agent-receipt-mu.vercel.app (the original deployment address; it now redirects to the live demo)
-- **Demo video:** https://youtu.be/QkUEvOSWIQc
+- **Demo video:** https://youtu.be/8SreNewjWY0
 - **Devpost:** https://devpost.com/software/agent-proceed (PayPal AI Hackathon, Devpost 1271266)
-- **Built for:** PayPal AI Hackathon
 
 ## The problem
 
