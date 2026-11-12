@@ -181,7 +181,7 @@ function calendar(from: string): string {
 const clean = (v: unknown, max: number): string | null => {
   if (typeof v !== 'string') return null
   // A model sometimes wraps a value in quote marks ("snowboard"). The quotes are never part of what the customer said.
-  const s = v.replace(/\s+/g, ' ').trim().replace(/^["'`\u2018\u2019\u201C\u201D]+|["'`\u2018\u2019\u201C\u201D]+$/g, '').trim()
+  const s = v.replace(/\s+/g, ' ').trim().replace(/^["'`‘’“”]+|["'`‘’“”]+$/g, '').trim()
   return s ? s.slice(0, max) : null
 }
 
